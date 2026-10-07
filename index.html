@@ -367,7 +367,7 @@
 
             <!-- PAYWALL BOX -->
             <div id="paywall-box" class="paywall-overlay">
-                <h4 style="color:#991b1b; margin:0 0 4px 0;" id="paywall-title-lbl">🔒 Preview Limit Reached (Page 10)</h4>
+                <h4 style="color:#991b1b; margin:0 0 4px 0;" id="paywall-title-lbl">🔒 Preview Limit Reached</h4>
                 <p style="font-size:11px; color:#7f1d1d; margin:2px 0;">Unlock full notes or watch an ad for +1 page:</p>
                 
                 <button class="btn btn-market" style="margin:3px 0; padding:8px;" onclick="payWithPaystack()">💳 Pay via Paystack (₦<span id="paywall-price-lbl">200</span>)</button>
@@ -439,20 +439,24 @@
 
         const urlParams = new URLSearchParams(window.location.search);
         const roomCode = urlParams.get('room');
-        const topic = urlParams.get('topic');
+        const topicParam = urlParams.get('topic');
         const stake = urlParams.get('stake');
 
-        if (roomCode && topic) {
+        if (roomCode && topicParam) {
+            let decodedTopic = decodeURIComponent(topicParam);
             activeMatchStake = stake ? parseFloat(stake) : 200;
+            
+            // Switch to challenge tab automatically
+            switchTab('tab-challenge', document.querySelectorAll('.nav-item')[3]);
+
             if (userWalletBalance < activeMatchStake) {
                 alert(`⚠️ Insufficient wallet balance to join this ₦${activeMatchStake} challenge! Please go to Profile to fund your wallet.`);
                 return;
             }
             userWalletBalance -= activeMatchStake;
             updateWalletUI();
-            alert(`⚔️ Joined Staked Room #${roomCode} on "${topic}"! Stake of ₦${activeMatchStake} deducted.`);
-            switchTab('tab-challenge', document.querySelectorAll('.nav-item')[3]);
-            fetchAndStartAIExam(topic);
+            alert(`⚔️ Joined Staked Room #${roomCode} on "${decodedTopic}"! Stake of ₦${activeMatchStake} deducted.`);
+            fetchAndStartAIExam(decodedTopic);
         }
     });
 
@@ -575,7 +579,6 @@
 
         alert(`✅ Withdrawal request for ₦${amount} to ${bankName} (${accountNumber} - ${accountName}) submitted successfully! Paystack payout processing initiated.`);
         
-        // Clear withdrawal fields
         document.getElementById('withdraw-acc-num').value = '';
         document.getElementById('withdraw-bank').value = '';
         document.getElementById('withdraw-acc-name').value = '';
@@ -652,7 +655,8 @@
             paywall.style.display = 'none';
             aiBtn.style.display = 'block';
         } else {
-            iframe.src = book.embedUrl + `#page=${book.allowedPages}`;
+            let cleanUrl = book.embedUrl.split('#')[0];
+            iframe.src = `${cleanUrl}#page=${book.allowedPages}`;
             iframe.style.display = 'block';
             paywall.style.display = 'flex';
             aiBtn.style.display = 'none';
@@ -702,7 +706,7 @@
                 window.openBook(currentBookIndex);
                 alert(`🎉 Success! You unlocked page ${book.allowedPages}. (${3 - adsWatchedToday} ad watches left today)`);
             }
-        }, 2000);
+        }, 1500);
     };
 
     window.askGeminiAI = async function() {
