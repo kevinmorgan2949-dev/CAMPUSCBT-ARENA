@@ -6,6 +6,8 @@
     <title>GradeX - Smart Library, CBT & Staked Arena</title>
     <!-- Paystack Inline JS Script -->
     <script src="https://js.paystack.co/v1/inline.js"></script>
+    <!-- Supabase JS Client SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --bg-color: #f8fafc;
@@ -214,7 +216,7 @@
 
             <!-- UPLOAD FORM -->
             <div id="upload-form-container" style="display:none; background:#f0fdf4; border:1px solid #bbf7d0; padding:12px; border-radius:8px; margin: 10px 0;">
-                <h4 style="margin:0 0 8px 0; color:#065f46;">Publish School PDF (Covered by Free Bonus)</h4>
+                <h4 style="margin:0 0 8px 0; color:#065f46;">Publish School PDF (Supabase Cloud Storage)</h4>
                 <div class="form-group">
                     <label>Title</label>
                     <input type="text" id="up-title" class="form-control" placeholder="e.g. Fluid Mechanics & Hydraulics">
@@ -224,7 +226,7 @@
                     <input type="text" id="up-author" class="form-control" placeholder="e.g. Engr. Kevin">
                 </div>
                 <div class="form-group">
-                    <label>Select PDF File (Any Size)</label>
+                    <label>Select PDF File</label>
                     <input type="file" id="up-file" class="form-control" accept="application/pdf">
                 </div>
                 <button class="btn btn-market" onclick="uploadAndPublishPdf()">Publish Free Using Bonus</button>
@@ -350,7 +352,7 @@
     </div>
 </div>
 
-<!-- Firebase SDK Scripts -->
+<!-- SDK Scripts (Firebase Auth/Firestore + Supabase Storage) -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -368,6 +370,11 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+
+    // Supabase Configuration (Configured with your project URL and Anon Key)
+    const SUPABASE_URL = "https://lbolsipvlxuoeorhwmte.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxib2xzaXB2bHh1b2Vvcmh3bXRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzODk5NzMsImV4cCI6MjEwNjk2NTk3M30.y89bLPoLfPncp82bOcwFhjangVupBB_MpsH6qfWyezA";
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const GEMINI_API_KEY = "AQ.Ab8RN6K2ZCCkApnjvMqvsOq2u-e1jkbBfOG8EbNIlVVvtR_Sag";
     const PAYSTACK_PUBLIC_KEY = "pk_live_2ed633e5b6ff8b9c4f4fa5108046e3d496397f8c";
@@ -507,22 +514,21 @@
             return alert("⚠️ Insufficient wallet balance. Please fund your wallet with at least ₦100 to publish this book.");
         }
 
-        alert("Uploading large school PDF automatically... Please wait.");
+        alert("Uploading PDF to Supabase Storage... Please wait.");
 
         try {
-            let formData = new FormData();
-            formData.append("reqtype", "fileupload");
-            formData.append("fileToUpload", fileInput);
+            let fileName = 'textbooks/' + Date.now() + '_' + fileInput.name;
+            let { data, error } = await supabaseClient.storage
+                .from('CampusCBT-library')
+                .upload(fileName, fileInput);
 
-            let res = await fetch("https://catbox.moe/user/api.php", {
-                method: "POST",
-                body: formData
-            });
-            let fileUrl = await res.text();
+            if (error) throw error;
 
-            if (!fileUrl.startsWith("http")) {
-                throw new Error("Automated upload server returned an error.");
-            }
+            let { data: publicUrlData } = supabaseClient.storage
+                .from('CampusCBT-library')
+                .getPublicUrl(fileName);
+
+            let fileUrl = publicUrlData.publicUrl;
 
             if (hasFreeUploadBonus) {
                 hasFreeUploadBonus = false; 
@@ -534,14 +540,14 @@
             await addDoc(booksRef, {
                 title: title,
                 author: author || "Student Creator",
-                fileUrl: fileUrl.trim(),
+                fileUrl: fileUrl,
                 createdAt: Date.now()
             });
 
             updateWalletUI();
             await saveUserData();
 
-            alert("✅ Textbook uploaded and published to the shared library successfully!");
+            alert("✅ Textbook securely uploaded to cloud storage and published!");
             document.getElementById('upload-form-container').style.display = 'none';
             document.getElementById('up-title').value = "";
             document.getElementById('up-author').value = "";
