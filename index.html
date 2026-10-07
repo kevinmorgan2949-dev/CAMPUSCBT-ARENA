@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CampusCBT Marketplace & Library</title>
+    <title>GradeX - Smart Library, CBT & Staked Arena</title>
     <!-- Paystack Inline JS Script -->
     <script src="https://js.paystack.co/v1/inline.js"></script>
     <style>
@@ -160,8 +160,8 @@
 
 <div class="app-container">
     <div class="header">
-        <h2 id="header-title">Student Account</h2>
-        <p id="header-subtitle">Firebase Authentication Portal</p>
+        <h2 id="header-title">GradeX 🚀</h2>
+        <p id="header-subtitle">Smart Library, CBT & Staked Arena</p>
     </div>
 
     <div class="content">
@@ -346,11 +346,11 @@
     </div>
 </div>
 
-<!-- Firebase SDK Scripts (Firestore Database Enabled) -->
+<!-- Firebase SDK Scripts (Firestore & Persistent Wallet Enabled) -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAKbQaiTWkpnjQ5OYNKuHBT_UB7xXhhx_A",
@@ -368,18 +368,33 @@
     const GEMINI_API_KEY = "AQ.Ab8RN6K2ZCCkApnjvMqvsOq2u-e1jkbBfOG8EbNIlVVvtR_Sag";
     const PAYSTACK_PUBLIC_KEY = "pk_live_2ed633e5b6ff8b9c4f4fa5108046e3d496397f8c";
 
-    let userWalletBalance = 0;
-    let authorEarnings = 0;
+    let userWalletBalance = parseFloat(localStorage.getItem('gradex_wallet')) || 0;
+    let authorEarnings = parseFloat(localStorage.getItem('gradex_earnings')) || 0;
     let activeMatchStake = 200;
     let libraryBooks = [];
     let currentBookIndex = 0;
     let generatedShareUrl = "";
 
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, async (user) => {
         if (user) {
             document.getElementById('auth-logged-out').style.display = 'none';
             document.getElementById('auth-logged-in').style.display = 'block';
             document.getElementById('user-email-display').innerText = user.email;
+            
+            try {
+                let userRef = doc(db, "users", user.uid);
+                let userSnap = await getDoc(userRef);
+                if (userSnap.exists()) {
+                    let data = userSnap.data();
+                    userWalletBalance = data.walletBalance || 0;
+                    authorEarnings = data.authorEarnings || 0;
+                } else {
+                    await setDoc(userRef, { walletBalance: userWalletBalance, authorEarnings: authorEarnings });
+                }
+                updateWalletUI();
+            } catch (e) {
+                console.log("Offline or sync error:", e);
+            }
         } else {
             document.getElementById('auth-logged-out').style.display = 'block';
             document.getElementById('auth-logged-in').style.display = 'none';
@@ -390,6 +405,19 @@
         updateWalletUI();
         loadLibraryFromFirestore();
     });
+
+    async function saveUserData() {
+        localStorage.setItem('gradex_wallet', userWalletBalance);
+        localStorage.setItem('gradex_earnings', authorEarnings);
+        if (auth.currentUser) {
+            try {
+                let userRef = doc(db, "users", auth.currentUser.uid);
+                await setDoc(userRef, { walletBalance: userWalletBalance, authorEarnings: authorEarnings }, { merge: true });
+            } catch (e) {
+                console.log("Cloud sync failed:", e);
+            }
+        }
+    }
 
     window.handleSignUp = async function() {
         let email = document.getElementById('auth-email').value;
@@ -414,12 +442,18 @@
 
     window.handleLogout = async function() {
         await signOut(auth);
+        userWalletBalance = 0;
+        authorEarnings = 0;
+        localStorage.clear();
+        updateWalletUI();
         switchTab('tab-auth', document.querySelectorAll('.nav-item')[0]);
     };
 
     function updateWalletUI() {
         document.getElementById('wallet-balance-display').innerText = `₦${userWalletBalance}`;
         document.getElementById('author-earnings-display').innerText = `₦${authorEarnings}`;
+        localStorage.setItem('gradex_wallet', userWalletBalance);
+        localStorage.setItem('gradex_earnings', authorEarnings);
     }
 
     window.fundWalletViaPaystack = function() {
@@ -431,7 +465,8 @@
             callback: function(res){
                 userWalletBalance += amount;
                 updateWalletUI();
-                alert('Wallet funded! Ref: ' + res.reference);
+                saveUserData();
+                alert('Wallet funded successfully! Ref: ' + res.reference);
             }
         });
         handler.openIframe();
@@ -450,8 +485,9 @@
         if (!title || !fileInput) return alert("Fill in all fields and select a PDF.");
         if (userWalletBalance < 100) return alert("⚠️ You need a ₦100 author upload fee in your wallet to publish.");
 
-        userWalletBalance -= 100; // Deduct listing fee
+        userWalletBalance -= 100;
         updateWalletUI();
+        saveUserData();
 
         alert("Converting PDF and saving to Firestore Database...");
 
@@ -473,8 +509,9 @@
                 loadLibraryFromFirestore();
             } catch (e) {
                 alert("Upload failed: " + e.message);
-                userWalletBalance += 100; // Refund on error
+                userWalletBalance += 100;
                 updateWalletUI();
+                saveUserData();
             }
         };
     };
@@ -517,9 +554,9 @@
         document.getElementById('modal-book-title').innerText = book.title;
         document.getElementById('book-frame').src = book.fileData;
         
-        // Monetize reading: reward author ₦1 per read
         authorEarnings += 1;
         updateWalletUI();
+        saveUserData();
 
         document.getElementById('book-modal').style.display = 'flex';
     };
@@ -548,7 +585,6 @@
         document.getElementById('book-modal').style.display = 'none';
     };
 
-    // Money Bet Arena with 10% Commission Model
     window.createStakedRoom = function() {
         let topic = document.getElementById('challenge-topic').value;
         let stake = parseFloat(document.getElementById('challenge-stake').value) || 200;
@@ -558,6 +594,7 @@
         userWalletBalance -= stake;
         activeMatchStake = stake;
         updateWalletUI();
+        saveUserData();
 
         let roomCode = Math.floor(1000 + Math.random() * 9000);
         let baseUrl = window.location.href.split('?')[0];
@@ -573,6 +610,7 @@
         userWalletBalance -= stake;
         activeMatchStake = stake;
         updateWalletUI();
+        saveUserData();
         startExamSession("General Knowledge");
     };
 
@@ -588,11 +626,12 @@
 
     window.nextQuestion = function() {
         let totalPool = activeMatchStake * 2;
-        let platformCommission = totalPool * 0.10; // 10% House Commission
-        let winnerPayout = totalPool - totalPool * 0.10; // 90% to Winner
+        let platformCommission = totalPool * 0.10;
+        let winnerPayout = totalPool - totalPool * 0.10;
 
         userWalletBalance += winnerPayout;
         updateWalletUI();
+        saveUserData();
 
         document.getElementById('final-score-display').innerText = `100%`;
         document.getElementById('prize-amount-text').innerText = `+₦${winnerPayout} (10% Platform Commission ₦${platformCommission} deducted)`;
@@ -608,6 +647,7 @@
         if (userWalletBalance < amount) return alert("⚠️ Insufficient balance!");
         userWalletBalance -= amount;
         updateWalletUI();
+        saveUserData();
         alert(`✅ Withdrawal of ₦${amount} requested successfully via Paystack Payout!`);
     };
 
