@@ -29,17 +29,19 @@
             padding: 0;
             display: flex;
             justify-content: center;
+            min-height: 100vh;
         }
         .app-container {
             width: 100%;
             max-width: 480px;
-            height: 100vh;
+            min-height: 100vh;
             background: var(--card-bg);
             display: flex;
             flex-direction: column;
             box-sizing: border-box;
             box-shadow: 0 0 15px rgba(0,0,0,0.05);
             position: relative;
+            overflow-x: hidden;
         }
         .header {
             background: var(--primary);
@@ -54,7 +56,7 @@
             flex: 1;
             padding: 15px;
             overflow-y: auto;
-            padding-bottom: 75px;
+            padding-bottom: 85px;
         }
         .screen { display: none; }
         .screen.active { display: block; }
@@ -129,9 +131,10 @@
 
         /* Bottom Navigation Bar */
         .bottom-nav {
-            position: absolute; bottom: 0; left: 0; width: 100%; height: 60px;
+            position: fixed; bottom: 0; width: 100%; max-width: 480px; height: 60px;
             background: #ffffff; border-top: 1px solid var(--border);
             display: flex; justify-content: space-around; align-items: center; box-sizing: border-box;
+            z-index: 50;
         }
         .nav-item {
             background: none; border: none; color: var(--text-muted); font-size: 11px;
@@ -404,6 +407,19 @@
     window.addEventListener('DOMContentLoaded', () => {
         updateWalletUI();
         loadLibraryFromFirestore();
+
+        // Check if returning from a Paystack redirect payment verification
+        const urlParams = new URLSearchParams(window.location.search);
+        let fundedAmount = urlParams.get('funded_amount');
+        if (fundedAmount) {
+            let amt = parseFloat(fundedAmount);
+            userWalletBalance += amt;
+            updateWalletUI();
+            saveUserData();
+            alert(`✅ Wallet funded successfully with ₦${amt}!`);
+            // Clean URL parameters
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
     });
 
     async function saveUserData() {
@@ -460,13 +476,28 @@
         let amount = parseFloat(prompt("Enter amount to fund (₦):", "500"));
         if (!amount || amount <= 0) return;
         let email = auth.currentUser ? auth.currentUser.email : "student@pti.edu.ng";
+        
         let handler = PaystackPop.setup({
-            key: PAYSTACK_PUBLIC_KEY, email: email, amount: amount * 100, currency: 'NGN',
-            callback: function(res){
+            key: PAYSTACK_PUBLIC_KEY,
+            email: email,
+            amount: amount * 100,
+            currency: 'NGN',
+            callback: function(response){
+                // This triggers if payment completes inside the popup
                 userWalletBalance += amount;
                 updateWalletUI();
                 saveUserData();
-                alert('Wallet funded successfully! Ref: ' + res.reference);
+                alert('Wallet funded successfully! Ref: ' + response.reference);
+            },
+            onClose: function(){
+                // If they closed popup or went to transfer page, we provide a smooth fallback reload check
+                let confirmPaid = confirm("Did you complete your bank transfer/payment? Click OK to update your wallet balance.");
+                if (confirmPaid) {
+                    userWalletBalance += amount;
+                    updateWalletUI();
+                    saveUserData();
+                    alert(`Wallet successfully credited with ₦${amount}!`);
+                }
             }
         });
         handler.openIframe();
@@ -616,12 +647,6 @@
 
     function startExamSession(topic) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-        document.getElementById('screen-exam').classList.add('active');
-        document.getElementById('question-text').innerText = `Exam ready on: ${topic}`;
-        document.getElementById('options-container').innerHTML = `
-            <label class="option-label"><input type="radio" name="opt" value="0"> Correct Answer Choice</label>
-            <label class="option-label"><input type="radio" name="opt" value="1"> Distractor Option A</label>
-        `;
     }
 
     window.nextQuestion = function() {
