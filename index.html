@@ -188,7 +188,8 @@
                 <p style="font-size:13px; color:var(--text-muted);">Logged in as: <strong id="user-email-display" style="color:var(--primary);"></strong></p>
                 <div class="card" style="background:#f8fafc;">
                     <h4 style="margin:0 0 5px 0;">Account Status</h4>
-                    <p style="font-size:12px; margin:2px 0;">✅ Firestore Cloud Database Active</p>
+                    <p style="font-size:12px; margin:2px 0;">✅ Unlimited Free Library Active</p>
+                    <p style="font-size:12px; margin:2px 0;">🎁 Free Publishing Bonus: <strong id="promo-bonus-display" style="color:var(--marketplace);">₦100</strong></p>
                     <p style="font-size:12px; margin:2px 0;">💰 Author Earnings: <strong id="author-earnings-display">₦0</strong></p>
                 </div>
                 <button class="btn" style="background:var(--danger); margin-top:20px;" onclick="handleLogout()">Sign Out</button>
@@ -207,32 +208,32 @@
         <!-- TAB 2: FREE LIBRARY -->
         <div id="tab-library" class="screen">
             <h3>Free Student Library</h3>
-            <p style="font-size:12px; color:var(--text-muted);">All notes are 100% free to read! Authors earn ₦1 per page read, funded by game arena commissions.</p>
+            <p style="font-size:12px; color:var(--text-muted);">Upload heavy textbooks & past questions easily. First-time upload is 100% FREE using your welcome bonus!</p>
             
-            <button class="btn btn-market" onclick="toggleUploadForm()">➕ Upload Your Note (₦100 Listing Fee)</button>
+            <button class="btn btn-market" onclick="toggleUploadForm()">➕ Upload PDF Textbook (Uses Free ₦100 Bonus)</button>
 
             <!-- UPLOAD FORM -->
             <div id="upload-form-container" style="display:none; background:#f0fdf4; border:1px solid #bbf7d0; padding:12px; border-radius:8px; margin: 10px 0;">
-                <h4 style="margin:0 0 8px 0; color:#065f46;">Publish Note (Fee: ₦100)</h4>
+                <h4 style="margin:0 0 8px 0; color:#065f46;">Publish School PDF (Covered by Free Bonus)</h4>
                 <div class="form-group">
                     <label>Title</label>
-                    <input type="text" id="up-title" class="form-control" placeholder="e.g. Petroleum Refining Notes">
+                    <input type="text" id="up-title" class="form-control" placeholder="e.g. Fluid Mechanics & Hydraulics">
                 </div>
                 <div class="form-group">
                     <label>Author / Creator Name</label>
                     <input type="text" id="up-author" class="form-control" placeholder="e.g. Engr. Kevin">
                 </div>
                 <div class="form-group">
-                    <label>Select PDF File</label>
+                    <label>Select PDF File (Any Size)</label>
                     <input type="file" id="up-file" class="form-control" accept="application/pdf">
                 </div>
-                <button class="btn btn-market" onclick="publishNoteToFirestore()">Pay ₦100 & Upload to Cloud</button>
+                <button class="btn btn-market" onclick="uploadAndPublishPdf()">Publish Free Using Bonus</button>
             </div>
 
             <div id="library-list-container" style="margin-top: 15px;">Loading library from cloud...</div>
         </div>
 
-        <!-- TAB 3: MONEY BET ARENA (WITH 10% COMMISSION) -->
+        <!-- TAB 3: MONEY BET ARENA -->
         <div id="tab-challenge" class="screen">
             <h3 style="color:var(--challenge-color); margin-top:0;">⚔️ Money Bet Arena</h3>
             <p style="font-size:12px; color:var(--text-muted);">Platform takes a sustainable 10% commission. Winner takes 90% of the pool!</p>
@@ -343,13 +344,13 @@
     <div class="bottom-nav">
         <button class="nav-item active" onclick="switchTab('tab-auth', this)"><span>🔐</span>Auth</button>
         <button class="nav-item" onclick="switchTab('tab-practice', this)"><span>📝</span>Practice</button>
-        <button class="nav-item" onclick="loadLibraryFromFirestore(); switchTab('tab-library', this)"><span>📚</span>Market</button>
+        <button class="nav-item" onclick="loadLibraryFromCloud(); switchTab('tab-library', this)"><span>📚</span>Market</button>
         <button class="nav-item" onclick="switchTab('tab-challenge', this)"><span>⚔️</span>Challenge</button>
         <button class="nav-item" onclick="switchTab('tab-profile', this)"><span>⚙️</span>Profile</button>
     </div>
 </div>
 
-<!-- Firebase SDK Scripts (Firestore & Persistent Wallet Enabled) -->
+<!-- Firebase SDK Scripts -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -373,6 +374,7 @@
 
     let userWalletBalance = parseFloat(localStorage.getItem('gradex_wallet')) || 0;
     let authorEarnings = parseFloat(localStorage.getItem('gradex_earnings')) || 0;
+    let hasFreeUploadBonus = localStorage.getItem('gradex_free_bonus') !== 'false'; 
     let activeMatchStake = 200;
     let libraryBooks = [];
     let currentBookIndex = 0;
@@ -391,8 +393,15 @@
                     let data = userSnap.data();
                     userWalletBalance = data.walletBalance || 0;
                     authorEarnings = data.authorEarnings || 0;
+                    if (data.hasFreeUploadBonus !== undefined) {
+                        hasFreeUploadBonus = data.hasFreeUploadBonus;
+                    }
                 } else {
-                    await setDoc(userRef, { walletBalance: userWalletBalance, authorEarnings: authorEarnings });
+                    await setDoc(userRef, { 
+                        walletBalance: userWalletBalance, 
+                        authorEarnings: authorEarnings,
+                        hasFreeUploadBonus: hasFreeUploadBonus 
+                    });
                 }
                 updateWalletUI();
             } catch (e) {
@@ -406,29 +415,21 @@
 
     window.addEventListener('DOMContentLoaded', () => {
         updateWalletUI();
-        loadLibraryFromFirestore();
-
-        // Check if returning from a Paystack redirect payment verification
-        const urlParams = new URLSearchParams(window.location.search);
-        let fundedAmount = urlParams.get('funded_amount');
-        if (fundedAmount) {
-            let amt = parseFloat(fundedAmount);
-            userWalletBalance += amt;
-            updateWalletUI();
-            saveUserData();
-            alert(`✅ Wallet funded successfully with ₦${amt}!`);
-            // Clean URL parameters
-            window.history.replaceState({}, document.title, window.location.pathname);
-        }
+        loadLibraryFromCloud();
     });
 
     async function saveUserData() {
         localStorage.setItem('gradex_wallet', userWalletBalance);
         localStorage.setItem('gradex_earnings', authorEarnings);
+        localStorage.setItem('gradex_free_bonus', hasFreeUploadBonus);
         if (auth.currentUser) {
             try {
                 let userRef = doc(db, "users", auth.currentUser.uid);
-                await setDoc(userRef, { walletBalance: userWalletBalance, authorEarnings: authorEarnings }, { merge: true });
+                await setDoc(userRef, { 
+                    walletBalance: userWalletBalance, 
+                    authorEarnings: authorEarnings,
+                    hasFreeUploadBonus: hasFreeUploadBonus
+                }, { merge: true });
             } catch (e) {
                 console.log("Cloud sync failed:", e);
             }
@@ -441,7 +442,9 @@
         if (!email || !password) return alert("Enter email and password.");
         try {
             await createUserWithEmailAndPassword(auth, email, password);
-            alert("Account created!");
+            hasFreeUploadBonus = true;
+            saveUserData();
+            alert("Account created! You received a free ₦100 bonus to publish your first textbook!");
         } catch (e) { alert(e.message); }
     };
 
@@ -460,6 +463,7 @@
         await signOut(auth);
         userWalletBalance = 0;
         authorEarnings = 0;
+        hasFreeUploadBonus = true;
         localStorage.clear();
         updateWalletUI();
         switchTab('tab-auth', document.querySelectorAll('.nav-item')[0]);
@@ -468,36 +472,20 @@
     function updateWalletUI() {
         document.getElementById('wallet-balance-display').innerText = `₦${userWalletBalance}`;
         document.getElementById('author-earnings-display').innerText = `₦${authorEarnings}`;
-        localStorage.setItem('gradex_wallet', userWalletBalance);
-        localStorage.setItem('gradex_earnings', authorEarnings);
+        document.getElementById('promo-bonus-display').innerText = hasFreeUploadBonus ? "₦100 (Active)" : "Used";
     }
 
     window.fundWalletViaPaystack = function() {
         let amount = parseFloat(prompt("Enter amount to fund (₦):", "500"));
         if (!amount || amount <= 0) return;
         let email = auth.currentUser ? auth.currentUser.email : "student@pti.edu.ng";
-        
         let handler = PaystackPop.setup({
-            key: PAYSTACK_PUBLIC_KEY,
-            email: email,
-            amount: amount * 100,
-            currency: 'NGN',
-            callback: function(response){
-                // This triggers if payment completes inside the popup
+            key: PAYSTACK_PUBLIC_KEY, email: email, amount: amount * 100, currency: 'NGN',
+            callback: function(res){
                 userWalletBalance += amount;
                 updateWalletUI();
                 saveUserData();
-                alert('Wallet funded successfully! Ref: ' + response.reference);
-            },
-            onClose: function(){
-                // If they closed popup or went to transfer page, we provide a smooth fallback reload check
-                let confirmPaid = confirm("Did you complete your bank transfer/payment? Click OK to update your wallet balance.");
-                if (confirmPaid) {
-                    userWalletBalance += amount;
-                    updateWalletUI();
-                    saveUserData();
-                    alert(`Wallet successfully credited with ₦${amount}!`);
-                }
+                alert('Wallet funded successfully! Ref: ' + res.reference);
             }
         });
         handler.openIframe();
@@ -508,185 +496,61 @@
         f.style.display = f.style.display === 'none' ? 'block' : 'none';
     };
 
-    window.publishNoteToFirestore = async function() {
+    window.uploadAndPublishPdf = async function() {
         let title = document.getElementById('up-title').value;
         let author = document.getElementById('up-author').value;
         let fileInput = document.getElementById('up-file').files[0];
 
-        if (!title || !fileInput) return alert("Fill in all fields and select a PDF.");
-        if (userWalletBalance < 100) return alert("⚠️ You need a ₦100 author upload fee in your wallet to publish.");
+        if (!title || !fileInput) return alert("Enter title and select a PDF file.");
 
-        userWalletBalance -= 100;
-        updateWalletUI();
-        saveUserData();
+        if (!hasFreeUploadBonus && userWalletBalance < 100) {
+            return alert("⚠️ Insufficient wallet balance. Please fund your wallet with at least ₦100 to publish this book.");
+        }
 
-        alert("Converting PDF and saving to Firestore Database...");
+        alert("Uploading large school PDF automatically... Please wait.");
 
-        let reader = new FileReader();
-        reader.readAsDataURL(fileInput);
-        reader.onload = async function () {
-            let base64Pdf = reader.result;
-            try {
-                const booksRef = collection(db, "notes");
-                await addDoc(booksRef, {
-                    title: title,
-                    author: author || "Student Creator",
-                    fileData: base64Pdf,
-                    createdAt: Date.now()
-                });
-
-                alert("✅ Note successfully published permanently to Firestore!");
-                document.getElementById('upload-form-container').style.display = 'none';
-                loadLibraryFromFirestore();
-            } catch (e) {
-                alert("Upload failed: " + e.message);
-                userWalletBalance += 100;
-                updateWalletUI();
-                saveUserData();
-            }
-        };
-    };
-
-    window.loadLibraryFromFirestore = async function() {
-        let container = document.getElementById('library-list-container');
-        container.innerHTML = "Loading cloud notes...";
         try {
-            const querySnapshot = await getDocs(collection(db, "notes"));
-            libraryBooks = [];
-            querySnapshot.forEach((doc) => {
-                libraryBooks.push(doc.data());
-            });
+            let formData = new FormData();
+            formData.append("reqtype", "fileupload");
+            formData.append("fileToUpload", fileInput);
 
-            if (libraryBooks.length === 0) {
-                container.innerHTML = `<div class="card" style="text-align:center; color:var(--text-muted);"><p>No cloud notes uploaded yet.</p></div>`;
-                return;
+            let res = await fetch("https://catbox.moe/user/api.php", {
+                method: "POST",
+                body: formData
+            });
+            let fileUrl = await res.text();
+
+            if (!fileUrl.startsWith("http")) {
+                throw new Error("Automated upload server returned an error.");
             }
 
-            let html = "";
-            libraryBooks.forEach((book, index) => {
-                html += `
-                    <div class="card" style="cursor:pointer;" onclick="openBook(${index})">
-                        <span class="badge-price" style="background:#dbeafe; color:#1e40af;">FREE</span>
-                        <h4 style="margin:0 0 4px 0;">📖 ${book.title}</h4>
-                        <p style="margin:2px 0; font-size:12px; color:var(--primary);">By: ${book.author}</p>
-                        <small style="color:#64748b;">Click to read free ➔</small>
-                    </div>
-                `;
+            if (hasFreeUploadBonus) {
+                hasFreeUploadBonus = false; 
+            } else {
+                userWalletBalance -= 100;
+            }
+
+            const booksRef = collection(db, "notes");
+            await addDoc(booksRef, {
+                title: title,
+                author: author || "Student Creator",
+                fileUrl: fileUrl.trim(),
+                createdAt: Date.now()
             });
-            container.innerHTML = html;
+
+            updateWalletUI();
+            await saveUserData();
+
+            alert("✅ Textbook uploaded and published to the shared library successfully!");
+            document.getElementById('upload-form-container').style.display = 'none';
+            document.getElementById('up-title').value = "";
+            document.getElementById('up-author').value = "";
+            document.getElementById('up-file').value = "";
+            
+            await loadLibraryFromCloud();
         } catch (e) {
-            container.innerHTML = `<p style="color:red;">Error loading cloud notes: ${e.message}</p>`;
+            alert("Upload failed: " + e.message);
         }
     };
 
-    window.openBook = function(index) {
-        currentBookIndex = index;
-        let book = libraryBooks[index];
-        document.getElementById('modal-book-title').innerText = book.title;
-        document.getElementById('book-frame').src = book.fileData;
-        
-        authorEarnings += 1;
-        updateWalletUI();
-        saveUserData();
-
-        document.getElementById('book-modal').style.display = 'flex';
-    };
-
-    window.askGeminiAI = async function() {
-        let book = libraryBooks[currentBookIndex];
-        let aiBox = document.getElementById('ai-explanation-box');
-        aiBox.style.display = 'block';
-        aiBox.innerHTML = `<strong>🤖 Gemini AI is analyzing "${book.title}"...</strong>`;
-
-        try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-goog-api-key': GEMINI_API_KEY },
-                body: JSON.stringify({ contents: [{ parts: [{ text: `Summarize the study note "${book.title}" in 2 sentences for a student.` }] }] })
-            });
-            const data = await response.json();
-            aiBox.innerHTML = `<strong>🤖 Gemini Breakdown:</strong><br>${data.candidates[0].content.parts[0].text}`;
-        } catch (e) {
-            aiBox.innerHTML = `⚠️ Gemini AI request failed.`;
-        }
-    };
-
-    window.closeBookModal = function() {
-        document.getElementById('book-frame').src = "";
-        document.getElementById('book-modal').style.display = 'none';
-    };
-
-    window.createStakedRoom = function() {
-        let topic = document.getElementById('challenge-topic').value;
-        let stake = parseFloat(document.getElementById('challenge-stake').value) || 200;
-        if (!topic) return alert("Enter a topic!");
-        if (userWalletBalance < stake) return alert("⚠️ Insufficient balance!");
-
-        userWalletBalance -= stake;
-        activeMatchStake = stake;
-        updateWalletUI();
-        saveUserData();
-
-        let roomCode = Math.floor(1000 + Math.random() * 9000);
-        let baseUrl = window.location.href.split('?')[0];
-        generatedShareUrl = `${baseUrl}?room=${roomCode}&topic=${encodeURIComponent(topic)}&stake=${stake}`;
-        document.getElementById('share-url-output').value = generatedShareUrl;
-        document.getElementById('share-link-box').style.display = 'block';
-        startExamSession(topic);
-    };
-
-    window.joinStakedRoom = function() {
-        let stake = parseFloat(document.getElementById('join-stake').value) || 200;
-        if (userWalletBalance < stake) return alert("⚠️ Insufficient balance!");
-        userWalletBalance -= stake;
-        activeMatchStake = stake;
-        updateWalletUI();
-        saveUserData();
-        startExamSession("General Knowledge");
-    };
-
-    function startExamSession(topic) {
-        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    }
-
-    window.nextQuestion = function() {
-        let totalPool = activeMatchStake * 2;
-        let platformCommission = totalPool * 0.10;
-        let winnerPayout = totalPool - totalPool * 0.10;
-
-        userWalletBalance += winnerPayout;
-        updateWalletUI();
-        saveUserData();
-
-        document.getElementById('final-score-display').innerText = `100%`;
-        document.getElementById('prize-amount-text').innerText = `+₦${winnerPayout} (10% Platform Commission ₦${platformCommission} deducted)`;
-        document.getElementById('prize-won-box').style.display = 'block';
-
-        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-        document.getElementById('screen-results').classList.add('active');
-    };
-
-    window.requestWithdrawal = function() {
-        let amount = parseFloat(document.getElementById('withdraw-amount').value);
-        if (!amount || amount < 100) return alert("Minimum withdrawal is ₦100.");
-        if (userWalletBalance < amount) return alert("⚠️ Insufficient balance!");
-        userWalletBalance -= amount;
-        updateWalletUI();
-        saveUserData();
-        alert(`✅ Withdrawal of ₦${amount} requested successfully via Paystack Payout!`);
-    };
-
-    window.switchTab = function(tabId, el) {
-        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-        document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
-        document.getElementById(tabId).classList.add('active');
-        if(el) el.classList.add('active');
-    };
-
-    window.goHome = function() {
-        switchTab('tab-practice', document.querySelectorAll('.nav-item')[1]);
-    };
-</script>
-
-</body>
-</html>
+    window.loadLibraryFromCloud = async function()
