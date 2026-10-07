@@ -6,8 +6,6 @@
     <title>CampusCBT Marketplace & Library</title>
     <!-- Paystack Inline JS Script -->
     <script src="https://js.paystack.co/v1/inline.js"></script>
-    <!-- Supabase UMD SDK CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --bg-color: #f8fafc;
@@ -172,11 +170,11 @@
 <div class="app-container">
     <div class="header">
         <h2 id="header-title">Student Account</h2>
-        <p id="header-subtitle">Supabase Authentication Portal</p>
+        <p id="header-subtitle">Firebase Authentication Portal</p>
     </div>
 
     <div class="content">
-        <!-- TAB 0: AUTH / PROFILE SCREEN -->
+        <!-- TAB 0: AUTH / LOGIN SCREEN -->
         <div id="tab-auth" class="screen active">
             <div id="auth-logged-out">
                 <h3 style="margin-top:0;">🔐 Student Portal Login</h3>
@@ -200,7 +198,7 @@
                 
                 <div class="card" style="background:#f8fafc; cursor:default;">
                     <h4 style="margin:0 0 5px 0;">Account Status</h4>
-                    <p style="font-size:12px; margin:2px 0;">✅ Supabase Session Active</p>
+                    <p style="font-size:12px; margin:2px 0;">✅ Firebase Session Active</p>
                     <p style="font-size:12px; margin:2px 0;">💳 Paystack Ready</p>
                 </div>
 
@@ -255,19 +253,8 @@
 
         <!-- TAB 3: TEST YOUR MIGHT (MONEY BET ARENA) -->
         <div id="tab-challenge" class="screen">
-            <div class="wallet-banner">
-                <div>
-                    <span style="font-size: 11px; opacity: 0.9;">In-Game Wallet</span>
-                    <h3 id="wallet-balance-display" style="margin:0; font-size: 18px;">₦0</h3>
-                </div>
-                <div style="display: flex; gap: 5px;">
-                    <button class="btn btn-market" style="width: auto; margin:0; padding: 6px 10px; font-size: 12px;" onclick="fundWalletViaPaystack()">+ Fund</button>
-                    <button class="btn btn-wallet" style="width: auto; margin:0; padding: 6px 10px; font-size: 12px;" onclick="requestWithdrawal()">Withdraw</button>
-                </div>
-            </div>
-
             <h3 style="color:var(--challenge-color); margin-top:0;">⚔️ Money Bet Arena</h3>
-            <p style="font-size:12px; color:var(--text-muted);">Stake money on AI challenges. Winner takes the entire prize pool!</p>
+            <p style="font-size:12px; color:var(--text-muted);">Stake money from your wallet on AI challenges. Winner takes the entire prize pool!</p>
             
             <div class="card" style="border-color: #fbcfe8; background: #fff1f2; cursor: default;">
                 <h4 style="margin:0 0 5px 0; color:#be185d;">🔥 Create Staked Challenge Room</h4>
@@ -300,6 +287,43 @@
                     <input type="number" id="join-stake" class="form-control" value="200">
                 </div>
                 <button class="btn" style="background:#475569;" onclick="joinStakedRoom()">Pay Stake & Enter Battle</button>
+            </div>
+        </div>
+
+        <!-- TAB 4: PROFILE & WALLET SETTINGS -->
+        <div id="tab-profile" class="screen">
+            <div class="wallet-banner">
+                <div>
+                    <span style="font-size: 11px; opacity: 0.9;">My Wallet Balance</span>
+                    <h3 id="wallet-balance-display" style="margin:0; font-size: 20px;">₦0</h3>
+                </div>
+                <div>
+                    <button class="btn btn-market" style="width: auto; margin:0; padding: 8px 14px; font-size: 13px;" onclick="fundWalletViaPaystack()">+ Fund Wallet</button>
+                </div>
+            </div>
+
+            <h3>⚙️ Profile & Withdrawal Settings</h3>
+            <p style="font-size:12px; color:var(--text-muted);">Manage your account details and request earnings payouts directly to your bank account (Min: ₦100).</p>
+
+            <div class="card" style="background:#f8fafc; cursor:default;">
+                <h4 style="margin:0 0 8px 0; color:var(--primary);">🏦 Bank Payout Details</h4>
+                <div class="form-group">
+                    <label>Account Number (10 Digits)</label>
+                    <input type="text" id="withdraw-acc-num" class="form-control" placeholder="0123456789" maxlength="10">
+                </div>
+                <div class="form-group">
+                    <label>Bank Name</label>
+                    <input type="text" id="withdraw-bank" class="form-control" placeholder="e.g. OPay, GTBank, Access Bank">
+                </div>
+                <div class="form-group">
+                    <label>Account Holder Name</label>
+                    <input type="text" id="withdraw-acc-name" class="form-control" placeholder="e.g. John Doe">
+                </div>
+                <div class="form-group">
+                    <label>Amount to Withdraw (₦)</label>
+                    <input type="number" id="withdraw-amount" class="form-control" placeholder="100" min="100">
+                </div>
+                <button class="btn btn-wallet" onclick="requestWithdrawal()">Request Bank Withdrawal</button>
             </div>
         </div>
 
@@ -360,20 +384,32 @@
 
     <!-- BOTTOM NAVIGATION -->
     <div class="bottom-nav">
-        <button class="nav-item active" onclick="switchTab('tab-auth', this)"><span>🔐</span>Account</button>
+        <button class="nav-item active" onclick="switchTab('tab-auth', this)"><span>🔐</span>Auth</button>
         <button class="nav-item" onclick="switchTab('tab-practice', this)"><span>📝</span>Practice</button>
-        <button class="nav-item" onclick="loadLibrary(); switchTab('tab-library', this)"><span>📚</span>Marketplace</button>
+        <button class="nav-item" onclick="loadLibrary(); switchTab('tab-library', this)"><span>📚</span>Market</button>
         <button class="nav-item" onclick="switchTab('tab-challenge', this)"><span>⚔️</span>Challenge</button>
+        <button class="nav-item" onclick="switchTab('tab-profile', this)"><span>⚙️</span>Profile</button>
     </div>
 </div>
 
-<script>
-    // --- SUPABASE CONFIGURATION ---
-    const SUPABASE_URL = "https://lbolsipvlxluoeorhwmte.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxib2xzaXB2bHh1b2Vvcmh3bXRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3railsODk5NzMsImV4cCI6MjEwNjk2NTk3M30.y89bLPoLfPncp82bOcwFhjangVupBB_MpsH6qfWyezA";
-    
-    // Fixed initialization via UMD global variable
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+<!-- Firebase SDK Scripts (Modular Version) -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+    // --- FIREBASE CONFIGURATION ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyAKbQaiTWkpnjQ5OYNKuHBT_UB7xXhhx_A",
+      authDomain: "studio-5048925414-4748e.firebaseapp.com",
+      projectId: "studio-5048925414-4748e",
+      storageBucket: "studio-5048925414-4748e.firebasestorage.app",
+      messagingSenderId: "933916912009",
+      appId: "1:933916912009:web:39731845c3824c89af1958"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
 
     const GEMINI_API_KEY = "AQ.Ab8RN6K2ZCCkApnjvMqvsOq2u-e1jkbBfOG8EbNIlVVvtR_Sag";
     const PAYSTACK_PUBLIC_KEY = "pk_live_2ed633e5b6ff8b9c4f4fa5108046e3d496397f8c";
@@ -389,17 +425,17 @@
     let generatedShareUrl = "";
     let adsWatchedToday = 0;
 
+    // Track Authentication state
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            updateAuthUI(user);
+        } else {
+            updateAuthUI(null);
+        }
+    });
+
     window.addEventListener('DOMContentLoaded', async () => {
         updateWalletUI();
-        
-        try {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (session) {
-                updateAuthUI(session.user);
-            }
-        } catch (e) {
-            console.error("Session check error:", e);
-        }
 
         const urlParams = new URLSearchParams(window.location.search);
         const roomCode = urlParams.get('room');
@@ -409,7 +445,7 @@
         if (roomCode && topic) {
             activeMatchStake = stake ? parseFloat(stake) : 200;
             if (userWalletBalance < activeMatchStake) {
-                alert(`⚠️ Insufficient wallet balance to join this ₦${activeMatchStake} challenge! Please tap "+ Fund" to top up your wallet.`);
+                alert(`⚠️ Insufficient wallet balance to join this ₦${activeMatchStake} challenge! Please go to Profile to fund your wallet.`);
                 return;
             }
             userWalletBalance -= activeMatchStake;
@@ -420,8 +456,8 @@
         }
     });
 
-    // --- SUPABASE AUTH FUNCTIONS ---
-    async function handleSignUp() {
+    // --- FIREBASE AUTH FUNCTIONS ---
+    window.handleSignUp = async function() {
         let email = document.getElementById('auth-email').value;
         let password = document.getElementById('auth-password').value;
 
@@ -430,15 +466,15 @@
             return;
         }
 
-        const { data, error } = await supabaseClient.auth.signUp({ email, password });
-        if (error) {
+        try {
+            await createUserWithEmailAndPassword(auth, email, password);
+            alert("Account created and signed in successfully!");
+        } catch (error) {
             alert("Sign up error: " + error.message);
-        } else {
-            alert("Account created successfully! Check your email inbox to confirm your account, or sign in now.");
         }
-    }
+    };
 
-    async function handleLogin() {
+    window.handleLogin = async function() {
         let email = document.getElementById('auth-email').value;
         let password = document.getElementById('auth-password').value;
 
@@ -447,22 +483,24 @@
             return;
         }
 
-        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        if (error) {
-            alert("Login failed: " + error.message);
-        } else {
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
             alert("Successfully signed in!");
-            updateAuthUI(data.user);
             switchTab('tab-practice', document.querySelectorAll('.nav-item')[1]);
+        } catch (error) {
+            alert("Login failed: " + error.message);
         }
-    }
+    };
 
-    async function handleLogout() {
-        await supabaseClient.auth.signOut();
-        updateAuthUI(null);
-        alert("Signed out successfully.");
-        switchTab('tab-auth', document.querySelectorAll('.nav-item')[0]);
-    }
+    window.handleLogout = async function() {
+        try {
+            await signOut(auth);
+            alert("Signed out successfully.");
+            switchTab('tab-auth', document.querySelectorAll('.nav-item')[0]);
+        } catch (error) {
+            alert("Logout error: " + error.message);
+        }
+    };
 
     function updateAuthUI(user) {
         if (user) {
@@ -479,7 +517,7 @@
         document.getElementById('wallet-balance-display').innerText = `₦${userWalletBalance}`;
     }
 
-    function fundWalletViaPaystack() {
+    window.fundWalletViaPaystack = function() {
         let amountStr = prompt("Enter amount to fund wallet (₦):", "500");
         if (!amountStr) return;
         let amount = parseFloat(amountStr);
@@ -488,7 +526,7 @@
             return;
         }
 
-        let userEmail = document.getElementById('user-email-display').innerText || prompt("Enter email for receipt:", "student@pti.edu.ng");
+        let userEmail = auth.currentUser ? auth.currentUser.email : prompt("Enter email for receipt:", "student@pti.edu.ng");
         if (!userEmail) return;
 
         let handler = PaystackPop.setup({
@@ -506,36 +544,50 @@
             }
         });
         handler.openIframe();
-    }
+    };
 
-    function requestWithdrawal() {
-        if (userWalletBalance <= 0) {
-            alert("Your wallet balance is empty. Win some battles or fund your wallet first!");
+    window.requestWithdrawal = function() {
+        let accountNumber = document.getElementById('withdraw-acc-num').value.trim();
+        let bankName = document.getElementById('withdraw-bank').value.trim();
+        let accountName = document.getElementById('withdraw-acc-name').value.trim();
+        let amountStr = document.getElementById('withdraw-amount').value;
+        let amount = parseFloat(amountStr);
+
+        if (!accountNumber || accountNumber.length !== 10) {
+            alert("Please enter a valid 10-digit account number.");
+            return;
+        }
+        if (!bankName || !accountName) {
+            alert("Please enter both your bank name and account holder name.");
+            return;
+        }
+        if (isNaN(amount) || amount < 100) {
+            alert("Minimum withdrawal amount is ₦100.");
+            return;
+        }
+        if (userWalletBalance < amount) {
+            alert(`⚠️ Insufficient wallet balance! You only have ₦${userWalletBalance}.`);
             return;
         }
 
-        let accountNumber = prompt("Enter 10-digit Account Number:", "");
-        let bankName = prompt("Enter Bank Name (e.g., OPay, Access Bank, GTB):", "");
-        let accountName = prompt("Enter Account Holder Name:", "");
-
-        if (!accountNumber || !bankName || !accountName) {
-            alert("Withdrawal cancelled. All fields are required.");
-            return;
-        }
-
-        let amountToWithdraw = userWalletBalance;
-        alert(`✅ Withdrawal request for ₦${amountToWithdraw} to ${bankName} (${accountNumber} - ${accountName}) submitted successfully! Payout will hit your bank account shortly.`);
-        
-        userWalletBalance = 0;
+        userWalletBalance -= amount;
         updateWalletUI();
-    }
 
-    function toggleUploadForm() {
+        alert(`✅ Withdrawal request for ₦${amount} to ${bankName} (${accountNumber} - ${accountName}) submitted successfully! Paystack payout processing initiated.`);
+        
+        // Clear withdrawal fields
+        document.getElementById('withdraw-acc-num').value = '';
+        document.getElementById('withdraw-bank').value = '';
+        document.getElementById('withdraw-acc-name').value = '';
+        document.getElementById('withdraw-amount').value = '';
+    };
+
+    window.toggleUploadForm = function() {
         let form = document.getElementById('upload-form-container');
         form.style.display = form.style.display === 'none' ? 'block' : 'none';
-    }
+    };
 
-    function publishNote() {
+    window.publishNote = function() {
         let title = document.getElementById('up-title').value;
         let author = document.getElementById('up-author').value;
         let price = document.getElementById('up-price').value;
@@ -560,10 +612,10 @@
 
         alert("Successfully published to the marketplace!");
         document.getElementById('upload-form-container').style.display = 'none';
-        loadLibrary(true);
-    }
+        window.loadLibrary(true);
+    };
 
-    function loadLibrary(forceRefresh = false) {
+    window.loadLibrary = function(forceRefresh = false) {
         let container = document.getElementById('library-list-container');
         if (!forceRefresh && container.innerHTML.trim() !== "") return;
         let html = "";
@@ -578,9 +630,9 @@
             `;
         });
         container.innerHTML = html;
-    }
+    };
 
-    function openBook(index) {
+    window.openBook = function(index) {
         currentBookIndex = index;
         let book = libraryBooks[index];
         document.getElementById('modal-book-title').innerText = book.title;
@@ -610,11 +662,11 @@
         aiBox.style.display = 'none';
         aiBox.innerText = "";
         document.getElementById('book-modal').style.display = 'flex';
-    }
+    };
 
-    function payWithPaystack() {
+    window.payWithPaystack = function() {
         let book = libraryBooks[currentBookIndex];
-        let userEmail = document.getElementById('user-email-display').innerText || prompt("Enter email address to receive receipt:", "student@pti.edu.ng");
+        let userEmail = auth.currentUser ? auth.currentUser.email : prompt("Enter email address to receive receipt:", "student@pti.edu.ng");
         if (!userEmail) return;
 
         let handler = PaystackPop.setup({
@@ -625,16 +677,16 @@
             callback: function(response){
                 alert('Payment successful! Reference: ' + response.reference);
                 book.isUnlocked = true;
-                openBook(currentBookIndex);
+                window.openBook(currentBookIndex);
             },
             onClose: function(){
                 alert('Transaction was not completed.');
             }
         });
         handler.openIframe();
-    }
+    };
 
-    function watchAdForExtraPage() {
+    window.watchAdForExtraPage = function() {
         if (adsWatchedToday >= 3) {
             alert("⚠️ You have reached your daily limit of 3 rewarded ad watches. Please pay via Paystack to unlock full access!");
             return;
@@ -647,13 +699,13 @@
                 adsWatchedToday++;
                 let book = libraryBooks[currentBookIndex];
                 book.allowedPages += 1; 
-                openBook(currentBookIndex);
+                window.openBook(currentBookIndex);
                 alert(`🎉 Success! You unlocked page ${book.allowedPages}. (${3 - adsWatchedToday} ad watches left today)`);
             }
         }, 2000);
-    }
+    };
 
-    async function askGeminiAI() {
+    window.askGeminiAI = async function() {
         let book = libraryBooks[currentBookIndex];
         let aiBox = document.getElementById('ai-explanation-box');
         aiBox.style.display = 'block';
@@ -682,15 +734,15 @@
         } catch (error) {
             aiBox.innerHTML = `⚠️ Network error connecting to Gemini AI.`;
         }
-    }
+    };
 
-    function closeBookModal() {
+    window.closeBookModal = function() {
         document.getElementById('book-frame').src = ""; 
         document.getElementById('book-modal').style.display = 'none';
-    }
+    };
 
     // --- MONEY BET CHALLENGE LOGIC ---
-    function createStakedRoom() {
+    window.createStakedRoom = function() {
         let topic = document.getElementById('challenge-topic').value;
         let stake = parseFloat(document.getElementById('challenge-stake').value) || 200;
 
@@ -700,7 +752,7 @@
         }
 
         if (userWalletBalance < stake) {
-            alert(`⚠️ Insufficient wallet balance! You need at least ₦${stake} in your wallet. Tap "+ Fund" first.`);
+            alert(`⚠️ Insufficient wallet balance! You need at least ₦${stake} in your wallet. Go to Profile to fund it.`);
             return;
         }
 
@@ -716,15 +768,15 @@
         document.getElementById('share-link-box').style.display = 'block';
 
         fetchAndStartAIExam(topic);
-    }
+    };
 
-    function shareToWhatsApp() {
+    window.shareToWhatsApp = function() {
         let topic = document.getElementById('challenge-topic').value;
         let text = encodeURIComponent(`⚔️ I just staked ₦${activeMatchStake} on a CBT battle on "${topic}"! Join me via CampusCBT AI and win the pool: ${generatedShareUrl}`);
         window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
-    }
+    };
 
-    function joinStakedRoom() {
+    window.joinStakedRoom = function() {
         let code = document.getElementById('room-code-input').value;
         let stake = parseFloat(document.getElementById('join-stake').value) || 200;
 
@@ -734,7 +786,7 @@
         }
 
         if (userWalletBalance < stake) {
-            alert(`⚠️ Insufficient wallet balance to match this ₦${stake} stake. Tap "+ Fund" to add money.`);
+            alert(`⚠️ Insufficient wallet balance to match this ₦${stake} stake. Go to Profile to fund your wallet.`);
             return;
         }
 
@@ -743,7 +795,7 @@
         updateWalletUI();
 
         fetchAndStartAIExam("General University Knowledge");
-    }
+    };
 
     async function fetchAndStartAIExam(topic) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -777,7 +829,7 @@
             startTimer();
         } catch (err) {
             alert("Failed to generate AI questions. Falling back to default questions.");
-            startExam('General Engineering & Math');
+            window.startExam('General Engineering & Math');
         }
     }
 
@@ -795,7 +847,7 @@
     let timerInterval;
     let timeLeft = 180;
 
-    function switchTab(tabId, element) {
+    window.switchTab = function(tabId, element) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
@@ -803,21 +855,25 @@
 
         if(tabId === 'tab-auth') {
             document.getElementById('header-title').innerText = "Student Account";
-            document.getElementById('header-subtitle').innerText = "Supabase Authentication Portal";
+            document.getElementById('header-subtitle').innerText = "Firebase Authentication Portal";
         } else if(tabId === 'tab-practice') {
-            document.getElementById('header-title').innerText = "CampusCBT Marketplace";
-            document.getElementById('header-subtitle').innerText = "Buy, sell & master university notes";
+            document.getElementById('header-title').innerText = "CampusCBT Practice";
+            document.getElementById('header-subtitle').innerText = "Master university exams";
         } else if(tabId === 'tab-library') {
             document.getElementById('header-title').innerText = "Student Notes Store";
             document.getElementById('header-subtitle').innerText = "Browse peer notes & upload your materials";
-            loadLibrary();
+            window.loadLibrary();
         } else if(tabId === 'tab-challenge') {
             document.getElementById('header-title').innerText = "Money Bet Arena";
-            document.getElementById('header-subtitle').innerText = "Live AI Staked Battles & Wallet";
+            document.getElementById('header-subtitle').innerText = "Live AI Staked Battles";
+        } else if(tabId === 'tab-profile') {
+            document.getElementById('header-title').innerText = "Profile & Settings";
+            document.getElementById('header-subtitle').innerText = "Wallet funds & bank withdrawals";
+            updateWalletUI();
         }
-    }
+    };
 
-    function startExam(subject) {
+    window.startExam = function(subject) {
         questions = questionBank[subject];
         currentIndex = 0;
         userAnswers = {};
@@ -826,7 +882,7 @@
         document.getElementById('screen-exam').classList.add('active');
         loadQuestion();
         startTimer();
-    }
+    };
 
     function startTimer() {
         clearInterval(timerInterval);
@@ -854,21 +910,21 @@
         document.getElementById('options-container').innerHTML = optHtml;
     }
 
-    function nextQuestion() {
+    window.nextQuestion = function() {
         if (currentIndex < questions.length - 1) {
             currentIndex++;
             loadQuestion();
         } else {
             submitExam();
         }
-    }
+    };
 
-    function prevQuestion() {
+    window.prevQuestion = function() {
         if (currentIndex > 0) {
             currentIndex--;
             loadQuestion();
         }
-    }
+    };
 
     function submitExam() {
         clearInterval(timerInterval);
@@ -896,9 +952,9 @@
         document.getElementById('screen-results').classList.add('active');
     }
 
-    function goHome() {
-        switchTab('tab-practice', document.querySelectorAll('.nav-item')[1]);
-    }
+    window.goHome = function() {
+        window.switchTab('tab-practice', document.querySelectorAll('.nav-item')[1]);
+    };
 </script>
 
 </body>
