@@ -553,4 +553,146 @@
         }
     };
 
-    window.loadLibraryFromCloud = async function()
+    window.loadLibraryFromCloud = async function() {
+        let container = document.getElementById('library-list-container');
+        container.innerHTML = "Loading cloud notes...";
+        try {
+            const querySnapshot = await getDocs(collection(db, "notes"));
+            libraryBooks = [];
+            querySnapshot.forEach((doc) => {
+                libraryBooks.push(doc.data());
+            });
+
+            if (libraryBooks.length === 0) {
+                container.innerHTML = `<div class="card" style="text-align:center; color:var(--text-muted);"><p>No cloud notes published yet.</p></div>`;
+                return;
+            }
+
+            let html = "";
+            libraryBooks.forEach((book, index) => {
+                html += `
+                    <div class="card" style="cursor:pointer;" onclick="openBook(${index})">
+                        <span class="badge-price" style="background:#dbeafe; color:#1e40af;">FREE</span>
+                        <h4 style="margin:0 0 4px 0;">📖 ${book.title}</h4>
+                        <p style="margin:2px 0; font-size:12px; color:var(--primary);">By: ${book.author}</p>
+                        <small style="color:#64748b;">Click to read free ➔</small>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        } catch (e) {
+            container.innerHTML = `<p style="color:red;">Error loading cloud notes: ${e.message}</p>`;
+        }
+    };
+
+    window.openBook = function(index) {
+        currentBookIndex = index;
+        let book = libraryBooks[index];
+        document.getElementById('modal-book-title').innerText = book.title;
+        document.getElementById('book-frame').src = book.fileUrl;
+        
+        authorEarnings += 1;
+        updateWalletUI();
+        saveUserData();
+
+        document.getElementById('book-modal').style.display = 'flex';
+    };
+
+    window.askGeminiAI = async function() {
+        let book = libraryBooks[currentBookIndex];
+        let aiBox = document.getElementById('ai-explanation-box');
+        aiBox.style.display = 'block';
+        aiBox.innerHTML = `<strong>🤖 Gemini AI is analyzing "${book.title}"...</strong>`;
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-goog-api-key': GEMINI_API_KEY },
+                body: JSON.stringify({ contents: [{ parts: [{ text: `Summarize the study note "${book.title}" in 2 sentences for a student.` }] }] })
+            });
+            const data = await response.json();
+            aiBox.innerHTML = `<strong>🤖 Gemini Breakdown:</strong><br>${data.candidates[0].content.parts[0].text}`;
+        } catch (e) {
+            aiBox.innerHTML = `⚠️ Gemini AI request failed.`;
+        }
+    };
+
+    window.closeBookModal = function() {
+        document.getElementById('book-frame').src = "";
+        document.getElementById('book-modal').style.display = 'none';
+    };
+
+    window.createStakedRoom = function() {
+        let topic = document.getElementById('challenge-topic').value;
+        let stake = parseFloat(document.getElementById('challenge-stake').value) || 200;
+        if (!topic) return alert("Enter a topic!");
+        if (userWalletBalance < stake) return alert("⚠️ Insufficient balance!");
+
+        userWalletBalance -= stake;
+        activeMatchStake = stake;
+        updateWalletUI();
+        saveUserData();
+
+        let roomCode = Math.floor(1000 + Math.random() * 9000);
+        let baseUrl = window.location.href.split('?')[0];
+        generatedShareUrl = `${baseUrl}?room=${roomCode}&topic=${encodeURIComponent(topic)}&stake=${stake}`;
+        document.getElementById('share-url-output').value = generatedShareUrl;
+        document.getElementById('share-link-box').style.display = 'block';
+        startExamSession(topic);
+    };
+
+    window.joinStakedRoom = function() {
+        let stake = parseFloat(document.getElementById('join-stake').value) || 200;
+        if (userWalletBalance < stake) return alert("⚠️ Insufficient balance!");
+        userWalletBalance -= stake;
+        activeMatchStake = stake;
+        updateWalletUI();
+        saveUserData();
+        startExamSession("General Knowledge");
+    };
+
+    function startExamSession(topic) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    }
+
+    window.nextQuestion = function() {
+        let totalPool = activeMatchStake * 2;
+        let platformCommission = totalPool * 0.10;
+        let winnerPayout = totalPool - totalPool * 0.10;
+
+        userWalletBalance += winnerPayout;
+        updateWalletUI();
+        saveUserData();
+
+        document.getElementById('final-score-display').innerText = `100%`;
+        document.getElementById('prize-amount-text').innerText = `+₦${winnerPayout} (10% Platform Commission ₦${platformCommission} deducted)`;
+        document.getElementById('prize-won-box').style.display = 'block';
+
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById('screen-results').classList.add('active');
+    };
+
+    window.requestWithdrawal = function() {
+        let amount = parseFloat(document.getElementById('withdraw-amount').value);
+        if (!amount || amount < 100) return alert("Minimum withdrawal is ₦100.");
+        if (userWalletBalance < amount) return alert("⚠️ Insufficient balance!");
+        userWalletBalance -= amount;
+        updateWalletUI();
+        saveUserData();
+        alert(`✅ Withdrawal of ₦${amount} requested successfully via Paystack Payout!`);
+    };
+
+    window.switchTab = function(tabId, el) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        if(el) el.classList.add('active');
+    };
+
+    window.goHome = function() {
+        switchTab('tab-practice', document.querySelectorAll('.nav-item')[1]);
+    };
+</script>
+
+</body>
+</html>
