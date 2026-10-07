@@ -352,7 +352,7 @@
     </div>
 </div>
 
-<!-- SDK Scripts (Firebase Auth/Firestore + Supabase Storage) -->
+<!-- SDK Scripts -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -371,7 +371,6 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // Supabase Configuration (Configured with your project URL and Anon Key)
     const SUPABASE_URL = "https://lbolsipvlxuoeorhwmte.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxib2xzaXB2bHh1b2Vvcmh3bXRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzODk5NzMsImV4cCI6MjEwNjk2NTk3M30.y89bLPoLfPncp82bOcwFhjangVupBB_MpsH6qfWyezA";
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
