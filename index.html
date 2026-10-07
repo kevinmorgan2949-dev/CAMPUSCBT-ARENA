@@ -6,6 +6,8 @@
     <title>CampusCBT Marketplace & Library</title>
     <!-- Paystack Inline JS Script -->
     <script src="https://js.paystack.co/v1/inline.js"></script>
+    <!-- Supabase JS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --bg-color: #f8fafc;
@@ -169,13 +171,45 @@
 
 <div class="app-container">
     <div class="header">
-        <h2 id="header-title">CampusCBT Marketplace</h2>
-        <p id="header-subtitle">Buy, sell & master university notes</p>
+        <h2 id="header-title">Student Account</h2>
+        <p id="header-subtitle">Supabase Authentication Portal</p>
     </div>
 
     <div class="content">
+        <!-- TAB 0: AUTH / PROFILE SCREEN -->
+        <div id="tab-auth" class="screen active">
+            <div id="auth-logged-out">
+                <h3 style="margin-top:0;">🔐 Student Portal Login</h3>
+                <p style="font-size:12px; color:var(--text-muted);">Sign in or create an account to securely save your details and access features.</p>
+                
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="auth-email" class="form-control" placeholder="student@pti.edu.ng">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="auth-password" class="form-control" placeholder="••••••••">
+                </div>
+                <button class="btn" onclick="handleLogin()">Sign In</button>
+                <button class="btn btn-market" onclick="handleSignUp()">Create New Account (Sign Up)</button>
+            </div>
+
+            <div id="auth-logged-in" style="display:none;">
+                <h3 style="margin-top:0;">👤 Welcome Back!</h3>
+                <p style="font-size:13px; color:var(--text-muted);">Logged in as: <strong id="user-email-display" style="color:var(--primary);"></strong></p>
+                
+                <div class="card" style="background:#f8fafc; cursor:default;">
+                    <h4 style="margin:0 0 5px 0;">Account Status</h4>
+                    <p style="font-size:12px; margin:2px 0;">✅ Supabase Session Active</p>
+                    <p style="font-size:12px; margin:2px 0;">💳 Paystack Ready</p>
+                </div>
+
+                <button class="btn" style="background:var(--danger); margin-top:20px;" onclick="handleLogout()">Sign Out</button>
+            </div>
+        </div>
+
         <!-- TAB 1: PRACTICE -->
-        <div id="tab-practice" class="screen active">
+        <div id="tab-practice" class="screen">
             <h3>CBT Practice Exams</h3>
             <div class="card" onclick="startExam('General Engineering & Math')">
                 <h4>📐 General Engineering & Math</h4>
@@ -235,7 +269,7 @@
             <h3 style="color:var(--challenge-color); margin-top:0;">⚔️ Money Bet Arena</h3>
             <p style="font-size:12px; color:var(--text-muted);">Stake money on AI challenges. Winner takes the entire prize pool!</p>
             
-            <div class="card" style="border-color: #fbcfe8; background: #fff1f2;">
+            <div class="card" style="border-color: #fbcfe8; background: #fff1f2; cursor: default;">
                 <h4 style="margin:0 0 5px 0; color:#be185d;">🔥 Create Staked Challenge Room</h4>
                 <div class="form-group">
                     <label>Enter Battle Topic</label>
@@ -255,7 +289,7 @@
                 <button class="btn btn-whatsapp" onclick="shareToWhatsApp()">💬 Share to WhatsApp</button>
             </div>
 
-            <div class="card" style="border-color: #e2e8f0; background: #f8fafc; margin-top: 15px;">
+            <div class="card" style="border-color: #e2e8f0; background: #f8fafc; margin-top: 15px; cursor: default;">
                 <h4 style="margin:0 0 5px 0; color:#334155;">⚡ Join Staked Room by Code</h4>
                 <div class="form-group">
                     <label>Enter 4-Digit Room Code</label>
@@ -326,13 +360,19 @@
 
     <!-- BOTTOM NAVIGATION -->
     <div class="bottom-nav">
-        <button class="nav-item active" onclick="switchTab('tab-practice', this)"><span>📝</span>Practice</button>
+        <button class="nav-item active" onclick="switchTab('tab-auth', this)"><span>🔐</span>Account</button>
+        <button class="nav-item" onclick="switchTab('tab-practice', this)"><span>📝</span>Practice</button>
         <button class="nav-item" onclick="loadLibrary(); switchTab('tab-library', this)"><span>📚</span>Marketplace</button>
         <button class="nav-item" onclick="switchTab('tab-challenge', this)"><span>⚔️</span>Challenge</button>
     </div>
 </div>
 
 <script>
+    // --- SUPABASE CONFIGURATION ---
+    const SUPABASE_URL = "https://lbolsipvlxluoeorhwmte.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxib2xzaXB2bHh1b2Vvcmh3bXRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3railsODk5NzMsImV4cCI6MjEwNjk2NTk3M30.y89bLPoLfPncp82bOcwFhjangVupBB_MpsH6qfWyezA";
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
     const GEMINI_API_KEY = "AQ.Ab8RN6K2ZCCkApnjvMqvsOq2u-e1jkbBfOG8EbNIlVVvtR_Sag";
     const PAYSTACK_PUBLIC_KEY = "pk_live_2ed633e5b6ff8b9c4f4fa5108046e3d496397f8c";
 
@@ -347,8 +387,15 @@
     let generatedShareUrl = "";
     let adsWatchedToday = 0;
 
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
         updateWalletUI();
+        
+        // Check active Supabase session
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (session) {
+            updateAuthUI(session.user);
+        }
+
         const urlParams = new URLSearchParams(window.location.search);
         const roomCode = urlParams.get('room');
         const topic = urlParams.get('topic');
@@ -363,10 +410,65 @@
             userWalletBalance -= activeMatchStake;
             updateWalletUI();
             alert(`⚔️ Joined Staked Room #${roomCode} on "${topic}"! Stake of ₦${activeMatchStake} deducted.`);
-            switchTab('tab-challenge', document.querySelectorAll('.nav-item')[2]);
+            switchTab('tab-challenge', document.querySelectorAll('.nav-item')[3]);
             fetchAndStartAIExam(topic);
         }
     });
+
+    // --- SUPABASE AUTH FUNCTIONS ---
+    async function handleSignUp() {
+        let email = document.getElementById('auth-email').value;
+        let password = document.getElementById('auth-password').value;
+
+        if (!email || !password) {
+            alert("Please enter both email and password.");
+            return;
+        }
+
+        const { data, error } = await supabaseClient.auth.signUp({ email, password });
+        if (error) {
+            alert("Sign up error: " + error.message);
+        } else {
+            alert("Account created successfully! Check your email inbox to confirm your account, or sign in now.");
+        }
+    }
+
+    async function handleLogin() {
+        let email = document.getElementById('auth-email').value;
+        let password = document.getElementById('auth-password').value;
+
+        if (!email || !password) {
+            alert("Please enter both email and password.");
+            return;
+        }
+
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) {
+            alert("Login failed: " + error.message);
+        } else {
+            alert("Successfully signed in!");
+            updateAuthUI(data.user);
+            switchTab('tab-practice', document.querySelectorAll('.nav-item')[1]);
+        }
+    }
+
+    async function handleLogout() {
+        await supabaseClient.auth.signOut();
+        updateAuthUI(null);
+        alert("Signed out successfully.");
+        switchTab('tab-auth', document.querySelectorAll('.nav-item')[0]);
+    }
+
+    function updateAuthUI(user) {
+        if (user) {
+            document.getElementById('auth-logged-out').style.display = 'none';
+            document.getElementById('auth-logged-in').style.display = 'block';
+            document.getElementById('user-email-display').innerText = user.email;
+        } else {
+            document.getElementById('auth-logged-out').style.display = 'block';
+            document.getElementById('auth-logged-in').style.display = 'none';
+        }
+    }
 
     function updateWalletUI() {
         document.getElementById('wallet-balance-display').innerText = `₦${userWalletBalance}`;
@@ -381,7 +483,7 @@
             return;
         }
 
-        let userEmail = prompt("Enter your email address for receipt:", "student@pti.edu.ng");
+        let userEmail = document.getElementById('user-email-display').innerText || prompt("Enter email for receipt:", "student@pti.edu.ng");
         if (!userEmail) return;
 
         let handler = PaystackPop.setup({
@@ -507,7 +609,7 @@
 
     function payWithPaystack() {
         let book = libraryBooks[currentBookIndex];
-        let userEmail = prompt("Enter your email address to receive receipt:", "student@pti.edu.ng");
+        let userEmail = document.getElementById('user-email-display').innerText || prompt("Enter email address to receive receipt:", "student@pti.edu.ng");
         if (!userEmail) return;
 
         let handler = PaystackPop.setup({
@@ -539,7 +641,7 @@
             if (watched) {
                 adsWatchedToday++;
                 let book = libraryBooks[currentBookIndex];
-                book.allowedPages += 1; // Unlock 1 extra page
+                book.allowedPages += 1; 
                 openBook(currentBookIndex);
                 alert(`🎉 Success! You unlocked page ${book.allowedPages}. (${3 - adsWatchedToday} ad watches left today)`);
             }
@@ -694,7 +796,10 @@
         document.getElementById(tabId).classList.add('active');
         if(element) element.classList.add('active');
 
-        if(tabId === 'tab-practice') {
+        if(tabId === 'tab-auth') {
+            document.getElementById('header-title').innerText = "Student Account";
+            document.getElementById('header-subtitle').innerText = "Supabase Authentication Portal";
+        } else if(tabId === 'tab-practice') {
             document.getElementById('header-title').innerText = "CampusCBT Marketplace";
             document.getElementById('header-subtitle').innerText = "Buy, sell & master university notes";
         } else if(tabId === 'tab-library') {
@@ -787,7 +892,7 @@
     }
 
     function goHome() {
-        switchTab('tab-practice', document.querySelector('.nav-item'));
+        switchTab('tab-practice', document.querySelectorAll('.nav-item')[1]);
     }
 </script>
 
