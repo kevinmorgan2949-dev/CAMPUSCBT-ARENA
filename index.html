@@ -6,8 +6,8 @@
     <title>CampusCBT Marketplace & Library</title>
     <!-- Paystack Inline JS Script -->
     <script src="https://js.paystack.co/v1/inline.js"></script>
-    <!-- Supabase JS SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Fixed Supabase JS SDK CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
     <style>
         :root {
             --bg-color: #f8fafc;
@@ -390,10 +390,13 @@
     window.addEventListener('DOMContentLoaded', async () => {
         updateWalletUI();
         
-        // Check active Supabase session
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        if (session) {
-            updateAuthUI(session.user);
+        try {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session) {
+                updateAuthUI(session.user);
+            }
+        } catch (e) {
+            console.error("Session check error:", e);
         }
 
         const urlParams = new URLSearchParams(window.location.search);
