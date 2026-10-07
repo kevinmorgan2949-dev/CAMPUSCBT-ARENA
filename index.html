@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusCBT & Multiplayer Battle Arena</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://js.paystack.co/v1/inline.js"></script>
+    <style>
+        :root {
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --border: #e2e8f0;
+            --accent: #6366f1;
+            --danger: #ef4444;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 0; }
+        header { background: var(--card-bg); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
+        .logo { font-weight: bold; font-size: 1.1rem; }
+        .wallet-badge { background: #ecfdf5; color: var(--primary-dark); padding: 6px 14px; border-radius: 20px; font-weight: bold; border: 1px solid #a7f3d0; }
+        .container { max-width: 600px; margin: 20px auto; padding: 0 15px; }
+        .auth-container { max-width: 400px; margin: 50px auto; padding: 20px; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid var(--border); }
+        .tabs { display: flex; background: #e2e8f0; border-radius: 10px; padding: 4px; margin-bottom: 20px; }
+        .tab { flex: 1; text-align: center; padding: 10px; font-weight: 600; cursor: pointer; border-radius: 8px; color: #64748b; font-size: 0.85rem; }
+        .tab.active { background: white; color: var(--text); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .section-view { display: none; }
+        .section-view.active { display: block; }
+        .card { background: var(--card-bg); border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; border: 1px solid var(--border); }
+        .btn { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-accent { background: var(--accent); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .room-card { background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 15px; margin-bottom: 12px; }
+        input, select, textarea { width: 100%; padding: 10px; margin-top: 6px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
+        
+        #gameModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 10px; box-sizing: border-box; }
+        .modal-content { background: white; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; padding: 20px; border-radius: 12px; }
+        .timer-display { font-size: 1.8rem; font-weight: bold; color: var(--danger); text-align: center; margin: 10px 0; }
+        .chat-box { background: #f1f5f9; border: 1px solid var(--border); border-radius: 8px; height: 100px; overflow-y: auto; padding: 8px; font-size: 0.85rem; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+
+    <!-- AUTHENTICATION SCREEN -->
+    <div id="authScreen" class="auth-container">
+        <h2 style="text-align:center; margin-top:0;" id="authTitle">Student Login</h2>
+        <div id="registerFields" style="display:none;">
+            <label>Full Name</label>
+            <input type="text" id="regName" placeholder="e.g., John Doe">
+        </div>
+        <label>Email Address</label>
+        <input type="email5" id="authEmail" placeholder="student@pti.edu.ng">
+        <label>Password</label>
+        <input type="password" id="authPassword" placeholder="••••••••">
+        
+        <button class="btn btn-primary" id="authSubmitBtn" onclick="handleAuth()">Login to Account</button>
+        <p style="text-align:center; font-size:0.85rem; margin-top:15px; cursor:pointer; color:var(--accent);" onclick="toggleAuthMode()" id="authSwitchText">
+            Don't have an account? Sign up
+        </p>
+    </div>
+
+    <!-- MAIN APP SCREEN (Hidden until logged in) -->
+    <div id="mainAppScreen" style="display:none;">
+        <header>
+            <div class="logo">CampusCBT Arena (<span id="userNameDisplay"></span>)</div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <div class="wallet-badge" id="walletBalance">₦1,000</div>
+                <button class="btn btn-danger" style="width: auto; padding: 4px 10px; margin:0; font-size:0.8rem;" onclick="logout()">Logout</button>
+            </div>
+        </header>
+
+        <div class="container">
+            <!-- Promo Code Claim Box -->
+            <div class="card" style="background: #f0fdf4; border-color: #bbf7d0; padding: 15px; margin-bottom: 15px;">
+                <div style="font-weight:bold; font-size:0.95rem; color:#065f46; margin-bottom:5px;">🎁 Have a Promo Code? Claim ₦100 Cash!</div>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="quickPromoInput" placeholder="Paste promo code here..." style="margin:0;">
+                    <button class="btn btn-primary" style="width: 100px; margin:0; padding:8px;" onclick="claimQuickPromo()">Redeem</button>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('marketplace')">📚 Notes</div>
+                <div class="tab" onclick="switchTab('upload')">📤 Upload PDF</div>
+                <div class="tab" onclick="switchTab('arena')">🎮 CBT Battle</div>
+            </div>
+
+            <!-- 1. MARKETPLACE -->
+            <div id="marketplaceSection" class="section-view active">
+                <div class="card">
+                    <div style="font-weight:bold; font-size:1.1rem; margin-bottom:10px;">Student Notes Marketplace</div>
+                    <div id="notesListContainer"></div>
+                </div>
+            </div>
+
+            <!-- 2. UPLOAD PDF -->
+            <div id="uploadSection" class="section-view">
+                <div class="card">
+                    <div style="font-weight:bold; font-size:1.1rem; margin-bottom:10px;">Publish Your PDF Note</div>
+                    <label>Document Title</label>
+                    <input type="text" id="uploadTitle" placeholder="e.g., GST 102 Summary">
+                    <label>Price (₦)</label>
+                    <input type="number" id="uploadPrice" placeholder="e.g., 500">
+                    <label>Select PDF File</label>
+                    <input type="file" id="uploadFile" accept=".pdf">
+                    <button class="btn btn-primary" onclick="publishPdfNote()">Publish to Marketplace</button>
+                </div>
+            </div>
+
+            <!-- 3. MULTIPLAYER BATTLE ARENA -->
+            <div id="arenaSection" class="section-view">
+                <div class="card">
+                    <div style="font-weight:bold; font-size:1.1rem; margin-bottom:10px;">⚡ Multiplayer CBT Battle Arena</div>
+                    
+                    <button class="btn btn-accent" onclick="toggleHostForm()">➕ Host Scheduled Sponsored / Bet Room</button>
+
+                    <!-- Create Room Form -->
+                    <div id="createRoomForm" style="display:none; background:#f1f5f9; padding:15px; border-radius:8px; margin-top:15px;">
+                        <h4 style="margin-top:0;">Host a Multiplayer Room</h4>
+                        <label>Room Name</label>
+                        <input type="text" id="roomNameInput" placeholder="e.g., Petroleum Giants Showdown">
+                        
+                        <label>Select Multiple PDFs for Gemini AI Questions</label>
+                        <select id="roomPdfSelect" multiple style="height: 80px;"></select>
+
+                        <label>Your Team Name</label>
+                        <input type="text" id="hostTeamName" placeholder="e.g., Alpha Titans">
+
+                        <label>Match Duration Timer (Seconds)</label>
+                        <input type="number" id="roomTimerInput" value="45" placeholder="45">
+
+                        <label>Room Mode</label>
+                        <select id="roomModeInput" onchange="togglePromoFields()">
+                            <option value="bet">Standard Bet Room</option>
+                            <option value="promo_sponsor">Announced Paystack Sponsored Room (Opens only on event day via code)</option>
+                        </select>
+
+                        <div id="promoFields" style="display:none; background:#e2e8f0; padding:10px; border-radius:6px; margin-bottom:10px;">
+                            <label style="font-size:0.8rem;">Event Promo Code (Announce this on WhatsApp/Email):</label>
+                            <input type="text" id="promoCodeInput" placeholder="e.g., PTISPECIAL" style="margin-bottom:6px;">
+                            <label style="font-size:0.8rem;">Max Slots to Fund via Paystack (e.g., 10 players = ₦1,000):</label>
+                            <input type="number" id="promoSlotsInput" value="10" placeholder="10" style="margin-bottom:6px;">
+                        </div>
+
+                        <label id="stakeLabel">Entry Stake / Total Prize Pool (₦)</label>
+                        <input type="number" id="roomStakeInput" placeholder="e.g., 400">
+
+                        <button class="btn btn-primary" onclick="createNewRoom()">Schedule & Fund Room Live</button>
+                    </div>
+
+                    <hr style="border:0; border-top:1px solid var(--border); margin:20px 0;">
+
+                    <h4 style="margin-bottom:10px;">🟢 Live Rooms Waiting for Players</h4>
+                    <div id="battleRoomsContainer">
+                        <p style="color:#64748b; font-size:0.9rem;">No active waiting rooms right now.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Match Lobby -->
+    <div id="gameModal">
+        <div class="modal-content">
+            <h3 id="modalRoomTitle" style="margin-top:0;">Room Lobby</h3>
+            <p style="font-size: 0.85rem; margin: 8px 0;">Team: <span id="modalTeamName" style="color:var(--accent); font-weight:bold;"></span></p>
+            <div class="timer-display" id="gameTimer">00:45</div>
+
+            <div style="background: #f8fafc; border: 1px solid var(--border); padding: 10px; border-radius: 8px; margin-bottom: 10px; font-weight: 600; font-size: 0.9rem;" id="modalQuestionBox">
+                Loading Gemini AI questions...
+            </div>
+
+            <label style="font-size: 0.8rem; font-weight: bold;">Team Chat Feed:</label>
+            <div class="chat-box" id="teamChatBox">
+                <div style="margin-bottom:4px;"><span>System:</span> Connected to secure room lobby.</div>
+            </div>
+            <div style="display: flex; gap: 5px;">
+                <input type="text" id="chatInput" placeholder="Type message..." style="margin:0;">
+                <button class="btn btn-primary" style="width: 70px; margin:0; padding:6px;" onclick="sendChatMessage()">Send</button>
+            </div>
+
+            <button class="btn btn-danger" style="margin-top: 12px;" onclick="leaveMatch()">Leave Room</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentUser = null;
+        let isRegistering = false;
+        let activeMatchInterval = null;
+
+        let state = {
+            notes: [
+                { id: 1, title: "Gns 101 Comprehensive Lecture Notes", price: 500, author: "Admin", purchasedType: 'permanent', fileName: "Gns_101.pdf" },
+                { id: 2, title: "Advanced Petroleum Engineering Guide", price: 1500, author: "Prof. Ahmed", purchasedType: null, fileName: "PTE_Guide.pdf" }
+            ],
+            waitingRooms: []
+        };
+
+        function toggleAuthMode() {
+            isRegistering = !isRegistering;
+            document.getElementById('authTitle').innerText = isRegistering ? "Create Student Account" : "Student Login";
+            document.getElementById('registerFields').style.display = isRegistering ? "block" : "none";
+            document.getElementById('authSubmitBtn').innerText = isRegistering ? "Register Account" : "Login to Account";
+            document.getElementById('authSwitchText').innerText = isRegistering ? "Already have an account? Login" : "Don't have an account? Sign up";
+        }
+
+        async function handleAuth() {
+            const email = document.getElementById('authEmail').value.trim();
+            const password = document.getElementById('authPassword').value.trim();
+            const name = document.getElementById('regName').value.trim();
+
+            if (!email || !password || (isRegistering && !name)) {
+                alert("Please fill in all fields.");
+                return;
+            }
+
+            const endpoint = isRegistering ? '/api/signup' : '/api/login';
+            const payload = isRegistering ? { name, email, password } : { email, password };
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    currentUser = data.user;
+                    document.getElementById('authScreen').style.display = 'none';
+                    document.getElementById('mainAppScreen').style.display = 'block';
+                    document.getElementById('userNameDisplay').innerText = currentUser.name;
+                    renderApp();
+                } else {
+                    alert(data.message);
+                }
+            } catch (err) {
+                alert("Server connection error.");
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            document.getElementById('mainAppScreen').style.display = 'none';
+            document.getElementById('authScreen').style.display = 'block';
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.section-view').forEach(s => s.classList.remove('active'));
+
+            if (tabName === 'marketplace') {
+                document.querySelectorAll('.tab')[0].classList.add('active');
+                document.getElementById('marketplaceSection').classList.add('active');
+            } else if (tabName === 'upload') {
+                document.querySelectorAll('.tab')[1].classList.add('active');
+                document.getElementById('uploadSection').classList.add('active');
+            } else {
+                document.querySelectorAll('.tab')[2].classList.add('active');
+                document.getElementById('arenaSection').classList.add('active');
+            }
+            renderApp();
+        }
+
+        function renderApp() {
+            if (!currentUser) return;
+            document.getElementById('walletBalance').innerText = `₦${currentUser.balance.toLocaleString()}`;
+
+            const notesContainer = document.getElementById('notesListContainer');
+            notesContainer.innerHTML = '';
+            state.notes.forEach(note => {
+                let actionBtn = `<button class="btn btn-primary" onclick="buyPdf(${note.id})">💳 Unlock Note (₦${note.price})</button>`;
+                notesContainer.innerHTML += `
+                    <div style="background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:15px; margin-bottom:12px;">
+                        <h4 style="margin:0 0 5px 0;">${note.title}</h4>
+                        <p style="margin:0 0 10px 0; font-size:0.85rem; color:#64748b;">By ${note.author} | Price: ₦${note.price}</p>
+                        ${actionBtn}
+                    </div>
+                `;
+            });
+
+            const pdfSelect = document.getElementById('roomPdfSelect');
+            if(pdfSelect) {
+                pdfSelect.innerHTML = '';
+                state.notes.forEach(note => {
+                    pdfSelect.innerHTML += `<option value="${note.title}">${note.title}</option>`;
+                });
+            }
+
+            const roomsContainer = document.getElementById('battleRoomsContainer');
+            if (roomsContainer) {
+                if (state.waitingRooms.length === 0) {
+                    roomsContainer.innerHTML = `<p style="color:#64748b; font-size:0.9rem;">No active waiting rooms. Watch your email/WhatsApp for scheduled sponsor announcements!</p>`;
+                    return;
+                }
+
+                roomsContainer.innerHTML = '';
+                state.waitingRooms.forEach(room => {
+                    let badgeText = room.mode === 'promo_sponsor' ? `🎁 Announced Sponsor Room (${room.remainingSlots} slots left)` : `Stake: ₦${room.stake}`;
+                    roomsContainer.innerHTML += `
+                        <div class="room-card">
+                            <h4 style="margin:0 0 5px 0;">${room.name}</h4>
+                            <p style="margin:0; font-size:0.8rem; color:#475569;">📚 Source PDFs: <strong>${room.pdfs.join(', ')}</strong></p>
+                            <p style="margin:3px 0; font-size:0.85rem; color:#64748b;">Host Team: <strong>${room.hostTeam}</strong> • ${badgeText}</p>
+                            <p style="margin:5px 0 10px 0; color: var(--primary-dark); font-weight: 600;">Prize: ${room.prize}</p>
+                            <button class="btn btn-accent" onclick="joinWaitingRoom('${room.id}', '${room.hostTeam}', ${room.timer}, ${JSON.stringify(room.pdfs)}, '${room.prize}', '${room.mode}', '${room.promoCode || ''}')">Join Battle Room & Lobby</button>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        function buyPdf(id) {
+            const note = state.notes.find(n => n.id === id);
+            if (note.price >= 1000) {
+                let choice = confirm(`⚠️ Premium Document (₦${note.price})\n\n💡 Pay just ₦100 for 24-Hour Online Reading Access?`);
+                if (choice) {
+                    if (currentUser.balance >= 100) {
+                        currentUser.balance -= 100;
+                        alert(`🎉 24-hour online reading access unlocked for "${note.title}"!`);
+                        renderApp();
+                    } else { alert("❌ Insufficient wallet balance."); }
+                }
+            }
+        }
+
+        function toggleHostForm() {
+            const form = document.getElementById('createRoomForm');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function togglePromoFields() {
+            const mode = document.getElementById('roomModeInput').value;
+            const promoDiv = document.getElementById('promoFields');
+            const stakeInput = document.getElementById('roomStakeInput');
+            const stakeLabel = document.getElementById('stakeLabel');
+
+            if (mode === 'promo_sponsor') {
+                promoDiv.style.display = 'block';
+                stakeInput.value = '1000';
+                stakeInput.disabled = true;
+                stakeLabel.innerText = "Paystack Scheduled Funding Amount";
+            } else {
+                promoDiv.style.display = 'none';
+                stakeInput.disabled = false;
+                stakeInput.value = '';
+                stakeLabel.innerText = "Entry Stake / Total Prize Pool (₦)";
+            }
+        }
+
+        function claimQuickPromo() {
+            const code = document.getElementById('quickPromoInput').value.trim();
+            if (!code) { alert("Enter a valid promo code."); return; }
+            currentUser.balance += 100;
+            alert(`🎉 Success! Promo code "${code}" redeemed. ₦100 added to your wallet!`);
+            document.getElementById('quickPromoInput').value = '';
+            renderApp();
+        }
+
+        function createNewRoom() {
+            const name = document.getElementById('roomNameInput').value.trim();
+            const teamName = document.getElementById('hostTeamName').value.trim() || "Alpha Squad";
+            const timerSecs = parseInt(document.getElementById('roomTimerInput').value) || 45;
+            const mode = document.getElementById('roomModeInput').value;
+            const pdfSelect = document.getElementById('roomPdfSelect');
+            let selectedPdfs = Array.from(pdfSelect.selectedOptions).map(opt => opt.value);
+
+            if (!name || selectedPdfs.length === 0) { alert("Fill all fields and select a PDF."); return; }
+
+            if (mode === 'promo_sponsor') {
+                const promoCode = document.getElementById('promoCodeInput').value.trim();
+                const totalSlots = parseInt(document.getElementById('promoSlotsInput').value) || 10;
+                const totalPaystackCost = totalSlots * 100;
+
+                if (!promoCode) { alert("Enter an event promo code to announce to your students."); return; }
+
+                let handler = PaystackPop.setup({
+                    key: 'pk_test_your_paystack_public_key_here',
+                    email: currentUser.email,
+                    amount: totalPaystackCost * 100,
+                    currency: 'NGN',
+                    ref: 'sponsor_' + Date.now(),
+                    callback: function(response) {
+                        const newRoom = {
+                            id: 'r_' + Date.now(),
+                            name,
+                            hostTeam: teamName,
+                            pdfs: selectedPdfs,
+                            timer: timerSecs,
+                            mode,
+                            promoCode,
+                            totalSlots,
+                            remainingSlots: totalSlots,
+                            prize: `₦${totalPaystackCost} Scheduled Sponsor Pool (Announce Code: ${promoCode})`
+                        };
+                        state.waitingRooms.push(newRoom);
+                        alert(`🎉 Paystack Payment Confirmed!\n\nRoom scheduled & funded. You can now announce the code "${promoCode}" via Email or WhatsApp for students to join!`);
+                        toggleHostForm();
+                        renderApp();
+                    },
+                    onClose: function() { alert('Payment cancelled.'); }
+                });
+                handler.openIframe();
+            } else {
+                const amount = parseInt(document.getElementById('roomStakeInput').value);
+                if (isNaN(amount) || currentUser.balance < amount) { alert("Invalid amount or insufficient balance."); return; }
+                currentUser.balance -= amount;
+                const newRoom = {
+                    id: 'r_' + Date.now(),
+                    name,
+                    hostTeam: teamName,
+                    pdfs: selectedPdfs,
+                    timer: timerSecs,
+                    mode,
+                    stake: amount,
+                    prize: `₦${(amount * 2).toLocaleString()} Bet Pool`
+                };
+                state.waitingRooms.push(newRoom);
+                alert("🎉 Bet room opened live!");
+                toggleHostForm();
+                renderApp();
+            }
+        }
+
+        function joinWaitingRoom(roomId, hostTeam, timerSecs, pdfs, prizeStr, mode, requiredCode) {
+            if (mode === 'promo_sponsor') {
+                let enteredCode = prompt(`🎁 Scheduled Sponsor Room!\n\nEnter the announcement code sent to your Email/WhatsApp to claim your free entry:`);
+                if (!enteredCode) return;
+
+                if (enteredCode.trim().toUpperCase() !== requiredCode.toUpperCase()) {
+                    alert("❌ Invalid announcement promo code! Check your WhatsApp/Email announcement.");
+                    return;
+                }
+
+                const roomObj = state.waitingRooms.find(r => r.id === roomId);
+                if (roomObj && roomObj.remainingSlots > 0) {
+                    roomObj.remainingSlots--;
+                    alert(`✅ Code accepted! Slot secured. (${roomObj.remainingSlots} slots left).`);
+                } else {
+                    alert("❌ All sponsored slots for this announced session have been claimed!");
+                    return;
+                }
+            }
+
+            state.waitingRooms = state.waitingRooms.filter(r => r.id !== roomId);
+            renderApp();
+
+            document.getElementById('modalRoomTitle').innerText = "Live Battle Lobby";
+            document.getElementById('modalTeamName').innerText = `${currentUser.name}'s Team`;
+            document.getElementById('gameModal').style.display = 'flex';
+            document.getElementById('modalQuestionBox').innerText = `Gemini AI Engine: Generating questions from [${pdfs.join(', ')}]...`;
+
+            socket.emit('join-room', { roomId, teamName: currentUser.name });
+
+            let timeLeft = timerSecs;
+            document.getElementById('gameTimer').innerText = `00:${timeLeft < 10 ? '0' : ''}${timeLeft}`;
+
+            if (activeMatchInterval) clearInterval(activeMatchInterval);
+
+            activeMatchInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('gameTimer').innerText = `00:${timeLeft < 10 ? '0' : ''}${timeLeft}`;
+                if (timeLeft <= 0) {
+                    clearInterval(activeMatchInterval);
+                    document.getElementById('gameModal').style.display = 'none';
+                    currentUser.balance += 200;
+                    renderApp();
+                    alert(`⏰ Time Up!\n\n🏆 Match Finished! Your team won ₦200.`);
+                }
+            }, 1000);
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const msg = input.value.trim();
+            if (!msg) return;
+            const chatBox = document.getElementById('teamChatBox');
+            chatBox.innerHTML += `<div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:bold;">${currentUser.name}:</span> ${msg}</div>`;
+            input.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function leaveMatch() {
+            if (activeMatchInterval) clearInterval(activeMatchInterval);
+            document.getElementById('gameModal').style.display = 'none';
+            renderApp();
+        }
+    </script>
+</body>
+</html>
