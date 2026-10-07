@@ -3,492 +3,793 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CampusCBT & Multiplayer Battle Arena</title>
-    <script src="/socket.io/socket.io.js"></script>
+    <title>CampusCBT Marketplace & Library</title>
+    <!-- Paystack Inline JS Script -->
     <script src="https://js.paystack.co/v1/inline.js"></script>
     <style>
         :root {
-            --primary: #10b981;
-            --primary-dark: #059669;
-            --bg: #f8fafc;
+            --bg-color: #f8fafc;
             --card-bg: #ffffff;
-            --text: #1e293b;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
             --border: #e2e8f0;
-            --accent: #6366f1;
+            --success: #22c55e;
             --danger: #ef4444;
+            --ai-color: #7c3aed;
+            --marketplace: #059669;
+            --challenge-color: #db2777;
         }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 0; }
-        header { background: var(--card-bg); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
-        .logo { font-weight: bold; font-size: 1.1rem; }
-        .wallet-badge { background: #ecfdf5; color: var(--primary-dark); padding: 6px 14px; border-radius: 20px; font-weight: bold; border: 1px solid #a7f3d0; }
-        .container { max-width: 600px; margin: 20px auto; padding: 0 15px; }
-        .auth-container { max-width: 400px; margin: 50px auto; padding: 20px; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid var(--border); }
-        .tabs { display: flex; background: #e2e8f0; border-radius: 10px; padding: 4px; margin-bottom: 20px; }
-        .tab { flex: 1; text-align: center; padding: 10px; font-weight: 600; cursor: pointer; border-radius: 8px; color: #64748b; font-size: 0.85rem; }
-        .tab.active { background: white; color: var(--text); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .section-view { display: none; }
-        .section-view.active { display: block; }
-        .card { background: var(--card-bg); border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; border: 1px solid var(--border); }
-        .btn { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-accent { background: var(--accent); color: white; }
-        .btn-danger { background: var(--danger); color: white; }
-        .room-card { background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 15px; margin-bottom: 12px; }
-        input, select, textarea { width: 100%; padding: 10px; margin-top: 6px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
-        
-        #gameModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 10px; box-sizing: border-box; }
-        .modal-content { background: white; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; padding: 20px; border-radius: 12px; }
-        .timer-display { font-size: 1.8rem; font-weight: bold; color: var(--danger); text-align: center; margin: 10px 0; }
-        .chat-box { background: #f1f5f9; border: 1px solid var(--border); border-radius: 8px; height: 100px; overflow-y: auto; padding: 8px; font-size: 0.85rem; margin-bottom: 8px; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+        }
+        .app-container {
+            width: 100%;
+            max-width: 480px;
+            height: 100vh;
+            background: var(--card-bg);
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            box-shadow: 0 0 15px rgba(0,0,0,0.05);
+            position: relative;
+        }
+        .header {
+            background: var(--primary);
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+        .header h2 { margin: 0 0 3px 0; font-size: 18px; }
+        .header p { margin: 0; font-size: 12px; opacity: 0.9; }
+
+        .content {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            padding-bottom: 75px;
+        }
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        .card {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 12px;
+            background: #ffffff;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .card:hover { border-color: var(--primary); background: #f8fafc; }
+
+        .badge-price {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: bold;
+            float: right;
+        }
+
+        .wallet-banner {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: white;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .form-group { margin-bottom: 10px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 3px; color: var(--text-muted); }
+        .form-control { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-size: 13px; }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            width: 100%;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .btn:hover { background: var(--primary-hover); }
+        .btn-ai { background: var(--ai-color); }
+        .btn-market { background: var(--marketplace); }
+        .btn-challenge { background: var(--challenge-color); }
+        .btn-challenge:hover { background: #be185d; }
+        .btn-whatsapp { background: #16a34a; }
+        .btn-wallet { background: #0284c7; }
+        .btn-ad { background: #d97706; }
+        .btn-ad:hover { background: #b45309; }
+
+        /* Exam Screen Styles */
+        .exam-topbar {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 15px; font-weight: bold; font-size: 13px; color: var(--text-muted);
+            border-bottom: 1px solid var(--border); padding-bottom: 8px;
+        }
+        .timer { background: #fee2e2; color: var(--danger); padding: 4px 8px; border-radius: 6px; }
+        .question-box { font-size: 15px; font-weight: 600; margin-bottom: 15px; line-height: 1.4; }
+        .option-label {
+            display: block; border: 1px solid var(--border); border-radius: 8px;
+            padding: 10px 12px; margin-bottom: 8px; cursor: pointer; font-size: 13px;
+        }
+        .option-label input { margin-right: 8px; }
+        .result-score { font-size: 32px; font-weight: bold; color: var(--primary); text-align: center; margin: 15px 0; }
+
+        /* Bottom Navigation Bar */
+        .bottom-nav {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 60px;
+            background: #ffffff; border-top: 1px solid var(--border);
+            display: flex; justify-content: space-around; align-items: center; box-sizing: border-box;
+        }
+        .nav-item {
+            background: none; border: none; color: var(--text-muted); font-size: 11px;
+            cursor: pointer; display: flex; flex-direction: column; align-items: center; flex: 1;
+        }
+        .nav-item.active { color: var(--primary); font-weight: bold; }
+        .nav-item span { font-size: 18px; margin-bottom: 2px; }
+
+        /* Reader Modal */
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 100;
+        }
+        .modal-content {
+            background: white; width: 95%; max-width: 440px; height: 88vh;
+            display: flex; flex-direction: column; border-radius: 10px; padding: 15px; box-sizing: border-box;
+        }
+        .book-iframe { flex: 1; width: 100%; border: 1px solid var(--border); border-radius: 6px; margin-top: 10px; }
+        .ai-box {
+            background: #f3e8ff; border: 1px solid #d8b4fe; border-radius: 8px;
+            padding: 10px; margin-top: 10px; font-size: 13px; color: #581c87; display: none; max-height: 110px; overflow-y: auto;
+        }
+        .paywall-overlay {
+            display: none; flex: 1; flex-direction: column; justify-content: center; align-items: center;
+            text-align: center; background: #fef2f2; border: 2px dashed #f87171; border-radius: 8px; padding: 15px; margin-top: 10px;
+        }
     </style>
 </head>
 <body>
 
-    <!-- AUTHENTICATION SCREEN -->
-    <div id="authScreen" class="auth-container">
-        <h2 style="text-align:center; margin-top:0;" id="authTitle">Student Login</h2>
-        <div id="registerFields" style="display:none;">
-            <label>Full Name</label>
-            <input type="text" id="regName" placeholder="e.g., John Doe">
-        </div>
-        <label>Email Address</label>
-        <input type="email5" id="authEmail" placeholder="student@pti.edu.ng">
-        <label>Password</label>
-        <input type="password" id="authPassword" placeholder="••••••••">
-        
-        <button class="btn btn-primary" id="authSubmitBtn" onclick="handleAuth()">Login to Account</button>
-        <p style="text-align:center; font-size:0.85rem; margin-top:15px; cursor:pointer; color:var(--accent);" onclick="toggleAuthMode()" id="authSwitchText">
-            Don't have an account? Sign up
-        </p>
+<div class="app-container">
+    <div class="header">
+        <h2 id="header-title">CampusCBT Marketplace</h2>
+        <p id="header-subtitle">Buy, sell & master university notes</p>
     </div>
 
-    <!-- MAIN APP SCREEN (Hidden until logged in) -->
-    <div id="mainAppScreen" style="display:none;">
-        <header>
-            <div class="logo">CampusCBT Arena (<span id="userNameDisplay"></span>)</div>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <div class="wallet-badge" id="walletBalance">₦1,000</div>
-                <button class="btn btn-danger" style="width: auto; padding: 4px 10px; margin:0; font-size:0.8rem;" onclick="logout()">Logout</button>
+    <div class="content">
+        <!-- TAB 1: PRACTICE -->
+        <div id="tab-practice" class="screen active">
+            <h3>CBT Practice Exams</h3>
+            <div class="card" onclick="startExam('General Engineering & Math')">
+                <h4>📐 General Engineering & Math</h4>
+                <p style="margin:4px 0 0 0; font-size:12px; color:var(--text-muted);">5 Practice Questions • 3 Mins</p>
             </div>
-        </header>
+            <div class="card" onclick="startExam('Use of English & Logic')">
+                <h4>📚 Use of English & Logic</h4>
+                <p style="margin:4px 0 0 0; font-size:12px; color:var(--text-muted);">5 Practice Questions • 3 Mins</p>
+            </div>
+        </div>
 
-        <div class="container">
-            <!-- Promo Code Claim Box -->
-            <div class="card" style="background: #f0fdf4; border-color: #bbf7d0; padding: 15px; margin-bottom: 15px;">
-                <div style="font-weight:bold; font-size:0.95rem; color:#065f46; margin-bottom:5px;">🎁 Have a Promo Code? Claim ₦100 Cash!</div>
-                <div style="display: flex; gap: 8px;">
-                    <input type="text" id="quickPromoInput" placeholder="Paste promo code here..." style="margin:0;">
-                    <button class="btn btn-primary" style="width: 100px; margin:0; padding:8px;" onclick="claimQuickPromo()">Redeem</button>
+        <!-- TAB 2: MARKETPLACE / LIBRARY -->
+        <div id="tab-library" class="screen">
+            <h3>Student Notes & Store</h3>
+            <p style="font-size:12px; color:var(--text-muted);">10 free preview pages. Watch an ad for +1 page (max 3 times/day) or pay via Paystack for full access!</p>
+            
+            <button class="btn btn-market" onclick="toggleUploadForm()">➕ Sell Your Notes / PDF</button>
+
+            <!-- UPLOAD FORM SECTION -->
+            <div id="upload-form-container" style="display:none; background:#f0fdf4; border:1px solid #bbf7d0; padding:12px; border-radius:8px; margin: 10px 0;">
+                <h4 style="margin:0 0 8px 0; color:#065f46;">List Your Note for Sale</h4>
+                <div class="form-group">
+                    <label>Note / Book Title</label>
+                    <input type="text" id="up-title" class="form-control" placeholder="e.g. Petroleum Engineering 101 Handout">
                 </div>
-            </div>
-
-            <div class="tabs">
-                <div class="tab active" onclick="switchTab('marketplace')">📚 Notes</div>
-                <div class="tab" onclick="switchTab('upload')">📤 Upload PDF</div>
-                <div class="tab" onclick="switchTab('arena')">🎮 CBT Battle</div>
-            </div>
-
-            <!-- 1. MARKETPLACE -->
-            <div id="marketplaceSection" class="section-view active">
-                <div class="card">
-                    <div style="font-weight:bold; font-size:1.1rem; margin-bottom:10px;">Student Notes Marketplace</div>
-                    <div id="notesListContainer"></div>
+                <div class="form-group">
+                    <label>Your Name / Author</label>
+                    <input type="text" id="up-author" class="form-control" placeholder="e.g. Engr. John">
                 </div>
-            </div>
-
-            <!-- 2. UPLOAD PDF -->
-            <div id="uploadSection" class="section-view">
-                <div class="card">
-                    <div style="font-weight:bold; font-size:1.1rem; margin-bottom:10px;">Publish Your PDF Note</div>
-                    <label>Document Title</label>
-                    <input type="text" id="uploadTitle" placeholder="e.g., GST 102 Summary">
+                <div class="form-group">
                     <label>Price (₦)</label>
-                    <input type="number" id="uploadPrice" placeholder="e.g., 500">
+                    <input type="number" id="up-price" class="form-control" placeholder="e.g. 1000">
+                </div>
+                <div class="form-group">
                     <label>Select PDF File</label>
-                    <input type="file" id="uploadFile" accept=".pdf">
-                    <button class="btn btn-primary" onclick="publishPdfNote()">Publish to Marketplace</button>
+                    <input type="file" id="up-file" class="form-control" accept="application/pdf">
+                </div>
+                <button class="btn btn-market" onclick="publishNote()">Publish to Marketplace</button>
+            </div>
+
+            <div id="library-list-container" style="margin-top: 15px;"></div>
+        </div>
+
+        <!-- TAB 3: TEST YOUR MIGHT (MONEY BET ARENA) -->
+        <div id="tab-challenge" class="screen">
+            <div class="wallet-banner">
+                <div>
+                    <span style="font-size: 11px; opacity: 0.9;">In-Game Wallet</span>
+                    <h3 id="wallet-balance-display" style="margin:0; font-size: 18px;">₦0</h3>
+                </div>
+                <div style="display: flex; gap: 5px;">
+                    <button class="btn btn-market" style="width: auto; margin:0; padding: 6px 10px; font-size: 12px;" onclick="fundWalletViaPaystack()">+ Fund</button>
+                    <button class="btn btn-wallet" style="width: auto; margin:0; padding: 6px 10px; font-size: 12px;" onclick="requestWithdrawal()">Withdraw</button>
                 </div>
             </div>
 
-            <!-- 3. MULTIPLAYER BATTLE ARENA -->
-            <div id="arenaSection" class="section-view">
-                <div class="card">
-                    <div style="font-weight:bold; font-size:1.1rem; margin-bottom:10px;">⚡ Multiplayer CBT Battle Arena</div>
-                    
-                    <button class="btn btn-accent" onclick="toggleHostForm()">➕ Host Scheduled Sponsored / Bet Room</button>
-
-                    <!-- Create Room Form -->
-                    <div id="createRoomForm" style="display:none; background:#f1f5f9; padding:15px; border-radius:8px; margin-top:15px;">
-                        <h4 style="margin-top:0;">Host a Multiplayer Room</h4>
-                        <label>Room Name</label>
-                        <input type="text" id="roomNameInput" placeholder="e.g., Petroleum Giants Showdown">
-                        
-                        <label>Select Multiple PDFs for Gemini AI Questions</label>
-                        <select id="roomPdfSelect" multiple style="height: 80px;"></select>
-
-                        <label>Your Team Name</label>
-                        <input type="text" id="hostTeamName" placeholder="e.g., Alpha Titans">
-
-                        <label>Match Duration Timer (Seconds)</label>
-                        <input type="number" id="roomTimerInput" value="45" placeholder="45">
-
-                        <label>Room Mode</label>
-                        <select id="roomModeInput" onchange="togglePromoFields()">
-                            <option value="bet">Standard Bet Room</option>
-                            <option value="promo_sponsor">Announced Paystack Sponsored Room (Opens only on event day via code)</option>
-                        </select>
-
-                        <div id="promoFields" style="display:none; background:#e2e8f0; padding:10px; border-radius:6px; margin-bottom:10px;">
-                            <label style="font-size:0.8rem;">Event Promo Code (Announce this on WhatsApp/Email):</label>
-                            <input type="text" id="promoCodeInput" placeholder="e.g., PTISPECIAL" style="margin-bottom:6px;">
-                            <label style="font-size:0.8rem;">Max Slots to Fund via Paystack (e.g., 10 players = ₦1,000):</label>
-                            <input type="number" id="promoSlotsInput" value="10" placeholder="10" style="margin-bottom:6px;">
-                        </div>
-
-                        <label id="stakeLabel">Entry Stake / Total Prize Pool (₦)</label>
-                        <input type="number" id="roomStakeInput" placeholder="e.g., 400">
-
-                        <button class="btn btn-primary" onclick="createNewRoom()">Schedule & Fund Room Live</button>
-                    </div>
-
-                    <hr style="border:0; border-top:1px solid var(--border); margin:20px 0;">
-
-                    <h4 style="margin-bottom:10px;">🟢 Live Rooms Waiting for Players</h4>
-                    <div id="battleRoomsContainer">
-                        <p style="color:#64748b; font-size:0.9rem;">No active waiting rooms right now.</p>
-                    </div>
+            <h3 style="color:var(--challenge-color); margin-top:0;">⚔️ Money Bet Arena</h3>
+            <p style="font-size:12px; color:var(--text-muted);">Stake money on AI challenges. Winner takes the entire prize pool!</p>
+            
+            <div class="card" style="border-color: #fbcfe8; background: #fff1f2;">
+                <h4 style="margin:0 0 5px 0; color:#be185d;">🔥 Create Staked Challenge Room</h4>
+                <div class="form-group">
+                    <label>Enter Battle Topic</label>
+                    <input type="text" id="challenge-topic" class="form-control" placeholder="Petroleum Refining">
                 </div>
+                <div class="form-group">
+                    <label>Bet Stake Amount (₦)</label>
+                    <input type="number" id="challenge-stake" class="form-control" value="200" min="100">
+                </div>
+                <button class="btn btn-challenge" onclick="createStakedRoom()">Stake & Create Link</button>
             </div>
+
+            <!-- SHARE LINK RESULT BOX -->
+            <div id="share-link-box" style="display:none; background:#f0fdf4; border:1px solid #bbf7d0; padding:12px; border-radius:8px; margin-top:10px;">
+                <h4 style="margin:0 0 5px 0; color:#065f46;">✅ Room Ready! Share Link:</h4>
+                <input type="text" id="share-url-output" class="form-control" readonly style="background:#fff; margin-bottom:5px;">
+                <button class="btn btn-whatsapp" onclick="shareToWhatsApp()">💬 Share to WhatsApp</button>
+            </div>
+
+            <div class="card" style="border-color: #e2e8f0; background: #f8fafc; margin-top: 15px;">
+                <h4 style="margin:0 0 5px 0; color:#334155;">⚡ Join Staked Room by Code</h4>
+                <div class="form-group">
+                    <label>Enter 4-Digit Room Code</label>
+                    <input type="text" id="room-code-input" class="form-control" placeholder="e.g. 4821" maxlength="4">
+                </div>
+                <div class="form-group">
+                    <label>Confirm Match Stake (₦)</label>
+                    <input type="number" id="join-stake" class="form-control" value="200">
+                </div>
+                <button class="btn" style="background:#475569;" onclick="joinStakedRoom()">Pay Stake & Enter Battle</button>
+            </div>
+        </div>
+
+        <!-- EXAM SCREEN -->
+        <div id="screen-exam" class="screen">
+            <div class="exam-topbar">
+                <span id="q-counter">Question 1/5</span>
+                <span class="timer" id="timer-display">03:00</span>
+            </div>
+            <div class="question-box" id="question-text">Loading question...</div>
+            <div id="options-container"></div>
+            <div class="nav-buttons">
+                <button class="btn" style="background:var(--text-muted);" onclick="prevQuestion()">Previous</button>
+                <button class="btn" onclick="nextQuestion()">Next / Submit</button>
+            </div>
+        </div>
+
+        <!-- RESULTS SCREEN -->
+        <div id="screen-results" class="screen">
+            <h2 style="text-align:center;">Battle Completed!</h2>
+            <div class="result-score" id="final-score-display">80%</div>
+            <p id="result-remark" style="text-align:center; font-weight:600; font-size:14px;"></p>
+            <div id="prize-won-box" style="background:#f0fdf4; border:1px solid #bbf7d0; padding:10px; border-radius:8px; text-align:center; margin:15px 0; display:none;">
+                <h4 style="color:#065f46; margin:0;">🎉 Prize Credited to Wallet!</h4>
+                <p id="prize-amount-text" style="color:#047857; font-weight:bold; margin:4px 0 0 0; font-size:16px;">+₦400</p>
+            </div>
+            <button class="btn" onclick="goHome()">Back to Practice</button>
         </div>
     </div>
 
-    <!-- Active Match Lobby -->
-    <div id="gameModal">
+    <!-- BOOK READER & PAYWALL MODAL -->
+    <div class="modal" id="book-modal">
         <div class="modal-content">
-            <h3 id="modalRoomTitle" style="margin-top:0;">Room Lobby</h3>
-            <p style="font-size: 0.85rem; margin: 8px 0;">Team: <span id="modalTeamName" style="color:var(--accent); font-weight:bold;"></span></p>
-            <div class="timer-display" id="gameTimer">00:45</div>
-
-            <div style="background: #f8fafc; border: 1px solid var(--border); padding: 10px; border-radius: 8px; margin-bottom: 10px; font-weight: 600; font-size: 0.9rem;" id="modalQuestionBox">
-                Loading Gemini AI questions...
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 id="modal-book-title" style="color:var(--primary); margin:0; font-size:15px;">Reader</h3>
+                <span id="modal-price-badge" class="badge-price">₦0</span>
             </div>
 
-            <label style="font-size: 0.8rem; font-weight: bold;">Team Chat Feed:</label>
-            <div class="chat-box" id="teamChatBox">
-                <div style="margin-bottom:4px;"><span>System:</span> Connected to secure room lobby.</div>
-            </div>
-            <div style="display: flex; gap: 5px;">
-                <input type="text" id="chatInput" placeholder="Type message..." style="margin:0;">
-                <button class="btn btn-primary" style="width: 70px; margin:0; padding:6px;" onclick="sendChatMessage()">Send</button>
-            </div>
+            <!-- PDF VIEWER FRAME -->
+            <iframe id="book-frame" class="book-iframe" src="" allowfullscreen></iframe>
 
-            <button class="btn btn-danger" style="margin-top: 12px;" onclick="leaveMatch()">Leave Room</button>
+            <!-- PAYWALL BOX -->
+            <div id="paywall-box" class="paywall-overlay">
+                <h4 style="color:#991b1b; margin:0 0 4px 0;" id="paywall-title-lbl">🔒 Preview Limit Reached (Page 10)</h4>
+                <p style="font-size:11px; color:#7f1d1d; margin:2px 0;">Unlock full notes or watch an ad for +1 page:</p>
+                
+                <button class="btn btn-market" style="margin:3px 0; padding:8px;" onclick="payWithPaystack()">💳 Pay via Paystack (₦<span id="paywall-price-lbl">200</span>)</button>
+                <button class="btn btn-ad" style="margin:3px 0; padding:8px;" id="watch-ad-btn" onclick="watchAdForExtraPage()">📺 Watch Ad (+1 Page)</button>
+                <small id="ads-left-lbl" style="font-size:10px; color:#991b1b; margin-top:2px;">Ads remaining today: 3/3</small>
+            </div>
+            
+            <div id="ai-explanation-box" class="ai-box"></div>
+
+            <button id="ai-btn" class="btn btn-ai" onclick="askGeminiAI()">✨ Ask Gemini AI to Explain</button>
+            <button class="btn" style="background:var(--danger); margin-top:5px;" onclick="closeBookModal()">Close Reader</button>
         </div>
     </div>
 
-    <script>
-        const socket = io();
-        let currentUser = null;
-        let isRegistering = false;
-        let activeMatchInterval = null;
+    <!-- BOTTOM NAVIGATION -->
+    <div class="bottom-nav">
+        <button class="nav-item active" onclick="switchTab('tab-practice', this)"><span>📝</span>Practice</button>
+        <button class="nav-item" onclick="loadLibrary(); switchTab('tab-library', this)"><span>📚</span>Marketplace</button>
+        <button class="nav-item" onclick="switchTab('tab-challenge', this)"><span>⚔️</span>Challenge</button>
+    </div>
+</div>
 
-        let state = {
-            notes: [
-                { id: 1, title: "Gns 101 Comprehensive Lecture Notes", price: 500, author: "Admin", purchasedType: 'permanent', fileName: "Gns_101.pdf" },
-                { id: 2, title: "Advanced Petroleum Engineering Guide", price: 1500, author: "Prof. Ahmed", purchasedType: null, fileName: "PTE_Guide.pdf" }
-            ],
-            waitingRooms: []
-        };
+<script>
+    const GEMINI_API_KEY = "AQ.Ab8RN6K2ZCCkApnjvMqvsOq2u-e1jkbBfOG8EbNIlVVvtR_Sag";
+    const PAYSTACK_PUBLIC_KEY = "pk_live_2ed633e5b6ff8b9c4f4fa5108046e3d496397f8c";
 
-        function toggleAuthMode() {
-            isRegistering = !isRegistering;
-            document.getElementById('authTitle').innerText = isRegistering ? "Create Student Account" : "Student Login";
-            document.getElementById('registerFields').style.display = isRegistering ? "block" : "none";
-            document.getElementById('authSubmitBtn').innerText = isRegistering ? "Register Account" : "Login to Account";
-            document.getElementById('authSwitchText').innerText = isRegistering ? "Already have an account? Login" : "Don't have an account? Sign up";
-        }
+    let userWalletBalance = 0;
+    let activeMatchStake = 200;
+    let libraryBooks = [
+        { title: "Advanced Engineering Mathematics", author: "Erwin Kreyszig", price: 200, embedUrl: "https://archive.org/embed/advancedengineer0000krey", isUnlocked: false, allowedPages: 10 },
+        { title: "Petroleum Reservoir Engineering Notes", author: "Dr. Ahmed (PTI)", price: 200, embedUrl: "https://archive.org/embed/engineeringmechan0000hibb_l4q6", isUnlocked: false, allowedPages: 10 }
+    ];
 
-        async function handleAuth() {
-            const email = document.getElementById('authEmail').value.trim();
-            const password = document.getElementById('authPassword').value.trim();
-            const name = document.getElementById('regName').value.trim();
+    let currentBookIndex = 0;
+    let generatedShareUrl = "";
+    let adsWatchedToday = 0;
 
-            if (!email || !password || (isRegistering && !name)) {
-                alert("Please fill in all fields.");
+    window.addEventListener('DOMContentLoaded', () => {
+        updateWalletUI();
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomCode = urlParams.get('room');
+        const topic = urlParams.get('topic');
+        const stake = urlParams.get('stake');
+
+        if (roomCode && topic) {
+            activeMatchStake = stake ? parseFloat(stake) : 200;
+            if (userWalletBalance < activeMatchStake) {
+                alert(`⚠️ Insufficient wallet balance to join this ₦${activeMatchStake} challenge! Please tap "+ Fund" to top up your wallet.`);
                 return;
             }
+            userWalletBalance -= activeMatchStake;
+            updateWalletUI();
+            alert(`⚔️ Joined Staked Room #${roomCode} on "${topic}"! Stake of ₦${activeMatchStake} deducted.`);
+            switchTab('tab-challenge', document.querySelectorAll('.nav-item')[2]);
+            fetchAndStartAIExam(topic);
+        }
+    });
 
-            const endpoint = isRegistering ? '/api/signup' : '/api/login';
-            const payload = isRegistering ? { name, email, password } : { email, password };
+    function updateWalletUI() {
+        document.getElementById('wallet-balance-display').innerText = `₦${userWalletBalance}`;
+    }
 
-            try {
-                const res = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
+    function fundWalletViaPaystack() {
+        let amountStr = prompt("Enter amount to fund wallet (₦):", "500");
+        if (!amountStr) return;
+        let amount = parseFloat(amountStr);
+        if (isNaN(amount) || amount <= 0) {
+            alert("Please enter a valid amount.");
+            return;
+        }
 
-                if (data.success) {
-                    currentUser = data.user;
-                    document.getElementById('authScreen').style.display = 'none';
-                    document.getElementById('mainAppScreen').style.display = 'block';
-                    document.getElementById('userNameDisplay').innerText = currentUser.name;
-                    renderApp();
-                } else {
-                    alert(data.message);
-                }
-            } catch (err) {
-                alert("Server connection error.");
+        let userEmail = prompt("Enter your email address for receipt:", "student@pti.edu.ng");
+        if (!userEmail) return;
+
+        let handler = PaystackPop.setup({
+            key: PAYSTACK_PUBLIC_KEY,
+            email: userEmail,
+            amount: amount * 100,
+            currency: 'NGN',
+            callback: function(response){
+                alert('Wallet funded successfully! Ref: ' + response.reference);
+                userWalletBalance += amount;
+                updateWalletUI();
+            },
+            onClose: function(){
+                alert('Wallet funding window closed.');
             }
+        });
+        handler.openIframe();
+    }
+
+    function requestWithdrawal() {
+        if (userWalletBalance <= 0) {
+            alert("Your wallet balance is empty. Win some battles or fund your wallet first!");
+            return;
         }
 
-        function logout() {
-            currentUser = null;
-            document.getElementById('mainAppScreen').style.display = 'none';
-            document.getElementById('authScreen').style.display = 'block';
+        let accountNumber = prompt("Enter 10-digit Account Number:", "");
+        let bankName = prompt("Enter Bank Name (e.g., OPay, Access Bank, GTB):", "");
+        let accountName = prompt("Enter Account Holder Name:", "");
+
+        if (!accountNumber || !bankName || !accountName) {
+            alert("Withdrawal cancelled. All fields are required.");
+            return;
         }
 
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.section-view').forEach(s => s.classList.remove('active'));
+        let amountToWithdraw = userWalletBalance;
+        alert(`✅ Withdrawal request for ₦${amountToWithdraw} to ${bankName} (${accountNumber} - ${accountName}) submitted successfully! Payout will hit your bank account shortly.`);
+        
+        userWalletBalance = 0;
+        updateWalletUI();
+    }
 
-            if (tabName === 'marketplace') {
-                document.querySelectorAll('.tab')[0].classList.add('active');
-                document.getElementById('marketplaceSection').classList.add('active');
-            } else if (tabName === 'upload') {
-                document.querySelectorAll('.tab')[1].classList.add('active');
-                document.getElementById('uploadSection').classList.add('active');
-            } else {
-                document.querySelectorAll('.tab')[2].classList.add('active');
-                document.getElementById('arenaSection').classList.add('active');
+    function toggleUploadForm() {
+        let form = document.getElementById('upload-form-container');
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function publishNote() {
+        let title = document.getElementById('up-title').value;
+        let author = document.getElementById('up-author').value;
+        let price = document.getElementById('up-price').value;
+        let fileInput = document.getElementById('up-file').files[0];
+
+        if (!title || !price || !fileInput) {
+            alert("Please fill in all fields and select a PDF file.");
+            return;
+        }
+
+        let fileURL = URL.createObjectURL(fileInput);
+        let numericPrice = parseFloat(price);
+
+        libraryBooks.unshift({
+            title: title,
+            author: author || "Student Creator",
+            price: numericPrice,
+            embedUrl: fileURL,
+            isUnlocked: false,
+            allowedPages: 10
+        });
+
+        alert("Successfully published to the marketplace!");
+        document.getElementById('upload-form-container').style.display = 'none';
+        loadLibrary(true);
+    }
+
+    function loadLibrary(forceRefresh = false) {
+        let container = document.getElementById('library-list-container');
+        if (!forceRefresh && container.innerHTML.trim() !== "") return;
+        let html = "";
+        libraryBooks.forEach((book, index) => {
+            html += `
+                <div class="card" onclick="openBook(${index})">
+                    <span class="badge-price">₦${book.price}</span>
+                    <h4 style="margin:0 0 4px 0;">📖 ${book.title}</h4>
+                    <p style="margin:2px 0; font-size:12px; color:var(--primary);">By: ${book.author}</p>
+                    <small style="color:#64748b;">Free preview up to page ${book.allowedPages} ➔</small>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    function openBook(index) {
+        currentBookIndex = index;
+        let book = libraryBooks[index];
+        document.getElementById('modal-book-title').innerText = book.title;
+        document.getElementById('modal-price-badge').innerText = `₦${book.price}`;
+        document.getElementById('paywall-price-lbl').innerText = book.price;
+        
+        let iframe = document.getElementById('book-frame');
+        let paywall = document.getElementById('paywall-box');
+        let aiBtn = document.getElementById('ai-btn');
+
+        document.getElementById('paywall-title-lbl').innerText = `🔒 Preview Limit Reached (Page ${book.allowedPages})`;
+        document.getElementById('ads-left-lbl').innerText = `Ads remaining today: ${3 - adsWatchedToday}/3`;
+
+        if (book.isUnlocked) {
+            iframe.src = book.embedUrl;
+            iframe.style.display = 'block';
+            paywall.style.display = 'none';
+            aiBtn.style.display = 'block';
+        } else {
+            iframe.src = book.embedUrl + `#page=${book.allowedPages}`;
+            iframe.style.display = 'block';
+            paywall.style.display = 'flex';
+            aiBtn.style.display = 'none';
+        }
+
+        let aiBox = document.getElementById('ai-explanation-box');
+        aiBox.style.display = 'none';
+        aiBox.innerText = "";
+        document.getElementById('book-modal').style.display = 'flex';
+    }
+
+    function payWithPaystack() {
+        let book = libraryBooks[currentBookIndex];
+        let userEmail = prompt("Enter your email address to receive receipt:", "student@pti.edu.ng");
+        if (!userEmail) return;
+
+        let handler = PaystackPop.setup({
+            key: PAYSTACK_PUBLIC_KEY,
+            email: userEmail,
+            amount: book.price * 100,
+            currency: 'NGN',
+            callback: function(response){
+                alert('Payment successful! Reference: ' + response.reference);
+                book.isUnlocked = true;
+                openBook(currentBookIndex);
+            },
+            onClose: function(){
+                alert('Transaction was not completed.');
             }
-            renderApp();
+        });
+        handler.openIframe();
+    }
+
+    function watchAdForExtraPage() {
+        if (adsWatchedToday >= 3) {
+            alert("⚠️ You have reached your daily limit of 3 rewarded ad watches. Please pay via Paystack to unlock full access!");
+            return;
         }
 
-        function renderApp() {
-            if (!currentUser) return;
-            document.getElementById('walletBalance').innerText = `₦${currentUser.balance.toLocaleString()}`;
+        alert("📺 Loading rewarded video ad...");
+        setTimeout(() => {
+            let watched = confirm("Ad completed! Click OK to receive +1 free page access.");
+            if (watched) {
+                adsWatchedToday++;
+                let book = libraryBooks[currentBookIndex];
+                book.allowedPages += 1; // Unlock 1 extra page
+                openBook(currentBookIndex);
+                alert(`🎉 Success! You unlocked page ${book.allowedPages}. (${3 - adsWatchedToday} ad watches left today)`);
+            }
+        }, 2000);
+    }
 
-            const notesContainer = document.getElementById('notesListContainer');
-            notesContainer.innerHTML = '';
-            state.notes.forEach(note => {
-                let actionBtn = `<button class="btn btn-primary" onclick="buyPdf(${note.id})">💳 Unlock Note (₦${note.price})</button>`;
-                notesContainer.innerHTML += `
-                    <div style="background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:15px; margin-bottom:12px;">
-                        <h4 style="margin:0 0 5px 0;">${note.title}</h4>
-                        <p style="margin:0 0 10px 0; font-size:0.85rem; color:#64748b;">By ${note.author} | Price: ₦${note.price}</p>
-                        ${actionBtn}
-                    </div>
-                `;
+    async function askGeminiAI() {
+        let book = libraryBooks[currentBookIndex];
+        let aiBox = document.getElementById('ai-explanation-box');
+        aiBox.style.display = 'block';
+        aiBox.innerHTML = `<strong>🤖 Gemini AI is thinking...</strong>`;
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-goog-api-key': GEMINI_API_KEY
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{ text: `Explain the core concepts of the student study note titled "${book.title}" authored by ${book.author} in 3 clear sentences for a university student.` }]
+                    }]
+                })
             });
 
-            const pdfSelect = document.getElementById('roomPdfSelect');
-            if(pdfSelect) {
-                pdfSelect.innerHTML = '';
-                state.notes.forEach(note => {
-                    pdfSelect.innerHTML += `<option value="${note.title}">${note.title}</option>`;
-                });
-            }
-
-            const roomsContainer = document.getElementById('battleRoomsContainer');
-            if (roomsContainer) {
-                if (state.waitingRooms.length === 0) {
-                    roomsContainer.innerHTML = `<p style="color:#64748b; font-size:0.9rem;">No active waiting rooms. Watch your email/WhatsApp for scheduled sponsor announcements!</p>`;
-                    return;
-                }
-
-                roomsContainer.innerHTML = '';
-                state.waitingRooms.forEach(room => {
-                    let badgeText = room.mode === 'promo_sponsor' ? `🎁 Announced Sponsor Room (${room.remainingSlots} slots left)` : `Stake: ₦${room.stake}`;
-                    roomsContainer.innerHTML += `
-                        <div class="room-card">
-                            <h4 style="margin:0 0 5px 0;">${room.name}</h4>
-                            <p style="margin:0; font-size:0.8rem; color:#475569;">📚 Source PDFs: <strong>${room.pdfs.join(', ')}</strong></p>
-                            <p style="margin:3px 0; font-size:0.85rem; color:#64748b;">Host Team: <strong>${room.hostTeam}</strong> • ${badgeText}</p>
-                            <p style="margin:5px 0 10px 0; color: var(--primary-dark); font-weight: 600;">Prize: ${room.prize}</p>
-                            <button class="btn btn-accent" onclick="joinWaitingRoom('${room.id}', '${room.hostTeam}', ${room.timer}, ${JSON.stringify(room.pdfs)}, '${room.prize}', '${room.mode}', '${room.promoCode || ''}')">Join Battle Room & Lobby</button>
-                        </div>
-                    `;
-                });
-            }
-        }
-
-        function buyPdf(id) {
-            const note = state.notes.find(n => n.id === id);
-            if (note.price >= 1000) {
-                let choice = confirm(`⚠️ Premium Document (₦${note.price})\n\n💡 Pay just ₦100 for 24-Hour Online Reading Access?`);
-                if (choice) {
-                    if (currentUser.balance >= 100) {
-                        currentUser.balance -= 100;
-                        alert(`🎉 24-hour online reading access unlocked for "${note.title}"!`);
-                        renderApp();
-                    } else { alert("❌ Insufficient wallet balance."); }
-                }
-            }
-        }
-
-        function toggleHostForm() {
-            const form = document.getElementById('createRoomForm');
-            form.style.display = form.style.display === 'none' ? 'block' : 'none';
-        }
-
-        function togglePromoFields() {
-            const mode = document.getElementById('roomModeInput').value;
-            const promoDiv = document.getElementById('promoFields');
-            const stakeInput = document.getElementById('roomStakeInput');
-            const stakeLabel = document.getElementById('stakeLabel');
-
-            if (mode === 'promo_sponsor') {
-                promoDiv.style.display = 'block';
-                stakeInput.value = '1000';
-                stakeInput.disabled = true;
-                stakeLabel.innerText = "Paystack Scheduled Funding Amount";
+            const data = await response.json();
+            if (data.candidates && data.candidates[0].content.parts[0].text) {
+                aiBox.innerHTML = `<strong>🤖 Gemini AI Breakdown:</strong><br>${data.candidates[0].content.parts[0].text}`;
             } else {
-                promoDiv.style.display = 'none';
-                stakeInput.disabled = false;
-                stakeInput.value = '';
-                stakeLabel.innerText = "Entry Stake / Total Prize Pool (₦)";
+                aiBox.innerHTML = `⚠️ API Error.`;
             }
+        } catch (error) {
+            aiBox.innerHTML = `⚠️ Network error connecting to Gemini AI.`;
+        }
+    }
+
+    function closeBookModal() {
+        document.getElementById('book-frame').src = ""; 
+        document.getElementById('book-modal').style.display = 'none';
+    }
+
+    // --- MONEY BET CHALLENGE LOGIC ---
+    function createStakedRoom() {
+        let topic = document.getElementById('challenge-topic').value;
+        let stake = parseFloat(document.getElementById('challenge-stake').value) || 200;
+
+        if (!topic) {
+            alert("Please enter a battle topic!");
+            return;
         }
 
-        function claimQuickPromo() {
-            const code = document.getElementById('quickPromoInput').value.trim();
-            if (!code) { alert("Enter a valid promo code."); return; }
-            currentUser.balance += 100;
-            alert(`🎉 Success! Promo code "${code}" redeemed. ₦100 added to your wallet!`);
-            document.getElementById('quickPromoInput').value = '';
-            renderApp();
+        if (userWalletBalance < stake) {
+            alert(`⚠️ Insufficient wallet balance! You need at least ₦${stake} in your wallet. Tap "+ Fund" first.`);
+            return;
         }
 
-        function createNewRoom() {
-            const name = document.getElementById('roomNameInput').value.trim();
-            const teamName = document.getElementById('hostTeamName').value.trim() || "Alpha Squad";
-            const timerSecs = parseInt(document.getElementById('roomTimerInput').value) || 45;
-            const mode = document.getElementById('roomModeInput').value;
-            const pdfSelect = document.getElementById('roomPdfSelect');
-            let selectedPdfs = Array.from(pdfSelect.selectedOptions).map(opt => opt.value);
+        userWalletBalance -= stake;
+        activeMatchStake = stake;
+        updateWalletUI();
 
-            if (!name || selectedPdfs.length === 0) { alert("Fill all fields and select a PDF."); return; }
+        let roomCode = Math.floor(1000 + Math.random() * 9000);
+        let baseUrl = window.location.href.split('?')[0];
+        generatedShareUrl = `${baseUrl}?room=${roomCode}&topic=${encodeURIComponent(topic)}&stake=${stake}`;
 
-            if (mode === 'promo_sponsor') {
-                const promoCode = document.getElementById('promoCodeInput').value.trim();
-                const totalSlots = parseInt(document.getElementById('promoSlotsInput').value) || 10;
-                const totalPaystackCost = totalSlots * 100;
+        document.getElementById('share-url-output').value = generatedShareUrl;
+        document.getElementById('share-link-box').style.display = 'block';
 
-                if (!promoCode) { alert("Enter an event promo code to announce to your students."); return; }
+        fetchAndStartAIExam(topic);
+    }
 
-                let handler = PaystackPop.setup({
-                    key: 'pk_test_your_paystack_public_key_here',
-                    email: currentUser.email,
-                    amount: totalPaystackCost * 100,
-                    currency: 'NGN',
-                    ref: 'sponsor_' + Date.now(),
-                    callback: function(response) {
-                        const newRoom = {
-                            id: 'r_' + Date.now(),
-                            name,
-                            hostTeam: teamName,
-                            pdfs: selectedPdfs,
-                            timer: timerSecs,
-                            mode,
-                            promoCode,
-                            totalSlots,
-                            remainingSlots: totalSlots,
-                            prize: `₦${totalPaystackCost} Scheduled Sponsor Pool (Announce Code: ${promoCode})`
-                        };
-                        state.waitingRooms.push(newRoom);
-                        alert(`🎉 Paystack Payment Confirmed!\n\nRoom scheduled & funded. You can now announce the code "${promoCode}" via Email or WhatsApp for students to join!`);
-                        toggleHostForm();
-                        renderApp();
-                    },
-                    onClose: function() { alert('Payment cancelled.'); }
-                });
-                handler.openIframe();
-            } else {
-                const amount = parseInt(document.getElementById('roomStakeInput').value);
-                if (isNaN(amount) || currentUser.balance < amount) { alert("Invalid amount or insufficient balance."); return; }
-                currentUser.balance -= amount;
-                const newRoom = {
-                    id: 'r_' + Date.now(),
-                    name,
-                    hostTeam: teamName,
-                    pdfs: selectedPdfs,
-                    timer: timerSecs,
-                    mode,
-                    stake: amount,
-                    prize: `₦${(amount * 2).toLocaleString()} Bet Pool`
-                };
-                state.waitingRooms.push(newRoom);
-                alert("🎉 Bet room opened live!");
-                toggleHostForm();
-                renderApp();
+    function shareToWhatsApp() {
+        let topic = document.getElementById('challenge-topic').value;
+        let text = encodeURIComponent(`⚔️ I just staked ₦${activeMatchStake} on a CBT battle on "${topic}"! Join me via CampusCBT AI and win the pool: ${generatedShareUrl}`);
+        window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    }
+
+    function joinStakedRoom() {
+        let code = document.getElementById('room-code-input').value;
+        let stake = parseFloat(document.getElementById('join-stake').value) || 200;
+
+        if (!code || code.length < 4) {
+            alert("Please enter a valid 4-digit room code.");
+            return;
+        }
+
+        if (userWalletBalance < stake) {
+            alert(`⚠️ Insufficient wallet balance to match this ₦${stake} stake. Tap "+ Fund" to add money.`);
+            return;
+        }
+
+        userWalletBalance -= stake;
+        activeMatchStake = stake;
+        updateWalletUI();
+
+        fetchAndStartAIExam("General University Knowledge");
+    }
+
+    async function fetchAndStartAIExam(topic) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById('screen-exam').classList.add('active');
+        document.getElementById('question-text').innerText = `🤖 Gemini AI is generating staked battle questions on "${topic}"...`;
+        document.getElementById('options-container').innerHTML = "";
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-goog-api-key': GEMINI_API_KEY
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{ text: `Generate 3 multiple choice questions about "${topic}". Output STRICTLY as valid JSON array of objects with keys: "q", "options" (array of 4 strings), and "answer" (index 0-3). No markdown backticks.` }]
+                    }]
+                })
+            });
+
+            const data = await response.json();
+            let rawText = data.candidates[0].content.parts[0].text;
+            rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+            
+            questions = JSON.parse(rawText);
+            currentIndex = 0;
+            userAnswers = {};
+            timeLeft = 120;
+            loadQuestion();
+            startTimer();
+        } catch (err) {
+            alert("Failed to generate AI questions. Falling back to default questions.");
+            startExam('General Engineering & Math');
+        }
+    }
+
+    const questionBank = {
+        'General Engineering & Math': [
+            { q: "What is the primary product of fractional distillation of crude oil?", options: ["Bitumen", "Gasoline/Petrol", "Lubricating Oil", "All of the above"], answer: 3 },
+            { q: "What is the derivative of x^2 with respect to x?", options: ["x", "2x", "x^2", "2"], answer: 1 },
+            { q: "Which law states that pressure is inversely proportional to volume at constant temperature?", options: ["Charles's Law", "Boyle's Law", "Hooke's Law", "Pascal's Law"], answer: 1 }
+        ]
+    };
+
+    let questions = [];
+    let currentIndex = 0;
+    let userAnswers = {};
+    let timerInterval;
+    let timeLeft = 180;
+
+    function switchTab(tabId, element) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        if(element) element.classList.add('active');
+
+        if(tabId === 'tab-practice') {
+            document.getElementById('header-title').innerText = "CampusCBT Marketplace";
+            document.getElementById('header-subtitle').innerText = "Buy, sell & master university notes";
+        } else if(tabId === 'tab-library') {
+            document.getElementById('header-title').innerText = "Student Notes Store";
+            document.getElementById('header-subtitle').innerText = "Browse peer notes & upload your materials";
+            loadLibrary();
+        } else if(tabId === 'tab-challenge') {
+            document.getElementById('header-title').innerText = "Money Bet Arena";
+            document.getElementById('header-subtitle').innerText = "Live AI Staked Battles & Wallet";
+        }
+    }
+
+    function startExam(subject) {
+        questions = questionBank[subject];
+        currentIndex = 0;
+        userAnswers = {};
+        timeLeft = 180;
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById('screen-exam').classList.add('active');
+        loadQuestion();
+        startTimer();
+    }
+
+    function startTimer() {
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            let mins = Math.floor(timeLeft / 60);
+            let secs = timeLeft % 60;
+            document.getElementById('timer-display').innerText = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                submitExam();
             }
+        }, 1000);
+    }
+
+    function loadQuestion() {
+        let qData = questions[currentIndex];
+        document.getElementById('q-counter').innerText = `Question ${currentIndex + 1}/${questions.length}`;
+        document.getElementById('question-text').innerText = qData.q;
+        let optHtml = '';
+        qData.options.forEach((opt, idx) => {
+            let checked = userAnswers[currentIndex] === idx ? 'checked' : '';
+            optHtml += `<label class="option-label"><input type="radio" name="exam-option" value="${idx}" ${checked} onclick="userAnswers[currentIndex] = ${idx}">${opt}</label>`;
+        });
+        document.getElementById('options-container').innerHTML = optHtml;
+    }
+
+    function nextQuestion() {
+        if (currentIndex < questions.length - 1) {
+            currentIndex++;
+            loadQuestion();
+        } else {
+            submitExam();
+        }
+    }
+
+    function prevQuestion() {
+        if (currentIndex > 0) {
+            currentIndex--;
+            loadQuestion();
+        }
+    }
+
+    function submitExam() {
+        clearInterval(timerInterval);
+        let score = 0;
+        questions.forEach((q, idx) => {
+            if (userAnswers[idx] === q.answer) score++;
+        });
+        let percentage = Math.round((score / questions.length) * 100);
+        document.getElementById('final-score-display').innerText = `${percentage}%`;
+        
+        let prizeBox = document.getElementById('prize-won-box');
+        if (percentage >= 70) {
+            let totalPrize = activeMatchStake * 2;
+            userWalletBalance += totalPrize;
+            updateWalletUI();
+            document.getElementById('result-remark').innerText = "🎉 Epic Victory! You won the challenge.";
+            document.getElementById('prize-amount-text').innerText = `+₦${totalPrize} Added to Wallet`;
+            prizeBox.style.display = 'block';
+        } else {
+            document.getElementById('result-remark').innerText = "👍 Tough battle! Better luck next time.";
+            prizeBox.style.display = 'none';
         }
 
-        function joinWaitingRoom(roomId, hostTeam, timerSecs, pdfs, prizeStr, mode, requiredCode) {
-            if (mode === 'promo_sponsor') {
-                let enteredCode = prompt(`🎁 Scheduled Sponsor Room!\n\nEnter the announcement code sent to your Email/WhatsApp to claim your free entry:`);
-                if (!enteredCode) return;
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById('screen-results').classList.add('active');
+    }
 
-                if (enteredCode.trim().toUpperCase() !== requiredCode.toUpperCase()) {
-                    alert("❌ Invalid announcement promo code! Check your WhatsApp/Email announcement.");
-                    return;
-                }
+    function goHome() {
+        switchTab('tab-practice', document.querySelector('.nav-item'));
+    }
+</script>
 
-                const roomObj = state.waitingRooms.find(r => r.id === roomId);
-                if (roomObj && roomObj.remainingSlots > 0) {
-                    roomObj.remainingSlots--;
-                    alert(`✅ Code accepted! Slot secured. (${roomObj.remainingSlots} slots left).`);
-                } else {
-                    alert("❌ All sponsored slots for this announced session have been claimed!");
-                    return;
-                }
-            }
-
-            state.waitingRooms = state.waitingRooms.filter(r => r.id !== roomId);
-            renderApp();
-
-            document.getElementById('modalRoomTitle').innerText = "Live Battle Lobby";
-            document.getElementById('modalTeamName').innerText = `${currentUser.name}'s Team`;
-            document.getElementById('gameModal').style.display = 'flex';
-            document.getElementById('modalQuestionBox').innerText = `Gemini AI Engine: Generating questions from [${pdfs.join(', ')}]...`;
-
-            socket.emit('join-room', { roomId, teamName: currentUser.name });
-
-            let timeLeft = timerSecs;
-            document.getElementById('gameTimer').innerText = `00:${timeLeft < 10 ? '0' : ''}${timeLeft}`;
-
-            if (activeMatchInterval) clearInterval(activeMatchInterval);
-
-            activeMatchInterval = setInterval(() => {
-                timeLeft--;
-                document.getElementById('gameTimer').innerText = `00:${timeLeft < 10 ? '0' : ''}${timeLeft}`;
-                if (timeLeft <= 0) {
-                    clearInterval(activeMatchInterval);
-                    document.getElementById('gameModal').style.display = 'none';
-                    currentUser.balance += 200;
-                    renderApp();
-                    alert(`⏰ Time Up!\n\n🏆 Match Finished! Your team won ₦200.`);
-                }
-            }, 1000);
-        }
-
-        function sendChatMessage() {
-            const input = document.getElementById('chatInput');
-            const msg = input.value.trim();
-            if (!msg) return;
-            const chatBox = document.getElementById('teamChatBox');
-            chatBox.innerHTML += `<div style="margin-bottom:4px;"><span style="color:var(--accent); font-weight:bold;">${currentUser.name}:</span> ${msg}</div>`;
-            input.value = '';
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        function leaveMatch() {
-            if (activeMatchInterval) clearInterval(activeMatchInterval);
-            document.getElementById('gameModal').style.display = 'none';
-            renderApp();
-        }
-    </script>
 </body>
 </html>
