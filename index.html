@@ -11,6 +11,8 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <!-- Paystack Inline Script -->
   <script src="https://js.paystack.co/v1/inline.js"></script>
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Google Gen AI & Firebase SDK Imports -->
   <script type="importmap">
     {
@@ -107,11 +109,16 @@
     
     const ai = new GoogleGenAI({ apiKey: "AIzaSyCU5NuF68PftNucPz2CvDGNPkZR0ikNpgY" });
 
+    // Real Supabase Client Initialization
+    const supabaseClient = supabase.createClient(
+      "https://lbolsipvlxuoeorhwmte.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxib2xzaXB2bHh1b2Vvcmh3bXRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzODk5NzMsImV4cCI6MjEwNjk2NTk3M30.y89bLPoLfPncp82bOcwFhjangVupBB_MpsH6qfWyezA"
+    );
+
     window.GradExCore = {
       auth,
       signUp: async (email, pass) => {
         const res = await createUserWithEmailAndPassword(auth, email, pass);
-        // Give new signups ₦100 free credit specifically for publishing their first book
         await setDoc(doc(db, "userProfiles", res.user.uid), { email, freePublishCredit: 100, balance: 5000 });
         return res;
       },
@@ -127,11 +134,28 @@
         await setDoc(doc(db, "userProfiles", uid), { freePublishCredit: newCredit }, { merge: true });
       },
 
-      generateQuestions: async (topic, count = 5) => {
+      uploadPdfToSupabase: async (file) => {
+        const fileName = `${Date.now()}_${file.name}`;
+        const { data, error } = await supabaseClient.storage
+          .from('CampusCBT-library')
+          .upload(fileName, file);
+
+        if (error) {
+          throw new Error("Supabase Upload Failed: " + error.message);
+        }
+
+        const { data: publicURLData } = supabaseClient.storage
+          .from('CampusCBT-library')
+          .getPublicUrl(fileName);
+
+        return publicURLData.publicUrl;
+      },
+
+      generateQuestionsFromText: async (documentText, count = 5) => {
         try {
           const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: `Generate ${count} multiple-choice CBT questions based on: "${topic}". Return strictly as a JSON array: [{"question":"","options":["","","",""],"answer":""}]`,
+            contents: `Analyze this document text/notes and generate ${count} accurate multiple-choice CBT questions based strictly on its content: "${documentText}". Return strictly as a JSON array: [{"question":"","options":["","","",""],"answer":""}]`,
             config: { responseMimeType: "application/json" }
           });
           return JSON.parse(response.text);
@@ -212,35 +236,49 @@
 
         setUploading(true);
 
-        const executeUpload = async () => {
-          const mockSupabaseUrl = `https://lbolsipvlxuoeorhwmte.supabase.co/storage/v1/object/public/CampusCBT-library/${file.name}`;
-          await window.GradExCore.addBook({ title, uploader: user.email, pdfUrl: mockSupabaseUrl });
-          setUploading(false);
-          alert("Published successfully to Supabase and Public Marketplace!");
-          window.GradExCore.getLibrary().then(setBooks);
-          setTitle('');
-          setFile(null);
-        };
+        try {
+          const reader = new FileReader();
+          reader.onload = async (event) => {
+            const fileTextContent = event.target.result;
 
-        // If user has the free ₦100 publishing credit, use it automatically for free!
-        if (profile.freePublishCredit >= 100) {
-          await window.GradExCore.updatePublishCredit(user.uid, 0);
-          setProfile({ ...profile, freePublishCredit: 0 });
-          alert("Your Free ₦100 New User Publishing Bonus was applied!");
-          await executeUpload();
-        } else {
-          // Otherwise use Paystack for subsequent publications
-          let handler = PaystackPop.setup({
-            key: 'pk_live_2ed633e5b6ff8b9c4f4fa5108046e3d496397f8c',
-            email: user.email,
-            amount: 10000, // ₦100 fee
-            currency: 'NGN',
-            callback: async (response) => {
-              await executeUpload();
-            },
-            onClose: () => setUploading(false)
-          });
-          handler.openIframe();
+            const executeSupabaseUpload = async () => {
+              const pdfUrl = await window.GradExCore.uploadPdfToSupabase(file);
+              await window.GradExCore.addBook({ 
+                title, 
+                uploader: user.email, 
+                pdfUrl, 
+                textContent: fileTextContent.substring(0, 15000)
+              });
+              setUploading(false);
+              alert("Published successfully! Saved to Supabase storage & Marketplace.");
+              window.GradExCore.getLibrary().then(setBooks);
+              setTitle('');
+              setFile(null);
+            };
+
+            if (profile.freePublishCredit >= 100) {
+              await window.GradExCore.updatePublishCredit(user.uid, 0);
+              setProfile({ ...profile, freePublishCredit: 0 });
+              alert("Your Free ₦100 New User Publishing Bonus was applied!");
+              await executeSupabaseUpload();
+            } else {
+              let handler = PaystackPop.setup({
+                key: 'pk_live_2ed633e5b6ff8b9c4f4fa5108046e3d496397f8c',
+                email: user.email,
+                amount: 10000,
+                currency: 'NGN',
+                callback: async () => {
+                  await executeSupabaseUpload();
+                },
+                onClose: () => setUploading(false)
+              });
+              handler.openIframe();
+            }
+          };
+          reader.readAsText(file);
+        } catch (err) {
+          alert("Error: " + err.message);
+          setUploading(false);
         }
       };
 
@@ -249,11 +287,20 @@
           <div className="card">
             <h2>📖 Reading: {readingBook.title}</h2>
             <p style={{fontSize: '0.8rem', color: 'var(--muted)'}}>Author: {readingBook.uploader}</p>
-            <div style={{background: '#f8fafc', padding: '20px', borderRadius: '8px', minHeight: '200px', border: '1px solid #e2e8f0'}}>
-              <p>📄 Document Viewer Active (Supabase Bucket: CampusCBT-library)</p>
-              <a href={readingBook.pdfUrl} target="_blank" className="btn btn-primary" style={{display: 'inline-block', textAlign: 'center', textDecoration: 'none', marginTop: '10px'}}>Download PDF / Note File</a>
+            
+            {/* Built-in Online Document Viewer / Reader */}
+            <div style={{background: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', margin: '10px 0'}}>
+              <iframe 
+                src={readingBook.pdfUrl} 
+                style={{width: '100%', height: '400px', border: 'none', borderRadius: '6px', background: '#fff'}}
+                title={readingBook.title}
+              />
             </div>
-            <button className="btn btn-primary" style={{marginTop: '15px'}} onClick={()=>setReadingBook(null)}>Close Reader</button>
+
+            <div style={{display: 'flex', gap: '10px', marginTop: '10px'}}>
+              <a href={readingBook.pdfUrl} download target="_blank" className="btn btn-primary" style={{textAlign: 'center', textDecoration: 'none'}}>Download PDF File 📥</a>
+              <button className="btn btn-secondary" onClick={()=>setReadingBook(null)}>Close Reader ✖</button>
+            </div>
           </div>
         );
       }
@@ -276,7 +323,7 @@
               <input type="file" accept=".pdf,.doc,.docx,.txt" onChange={e=>setFile(e.target.files[0])} required />
 
               <button type="submit" disabled={uploading} className="btn btn-secondary">
-                {uploading ? 'Processing & Uploading...' : (profile.freePublishCredit >= 100 ? 'Publish Free Using Bonus' : 'Pay ₦100 & Publish Publicly')}
+                {uploading ? 'Uploading to Supabase...' : (profile.freePublishCredit >= 100 ? 'Publish Free Using Bonus' : 'Pay ₦100 & Publish Publicly')}
               </button>
             </form>
           </div>
@@ -287,7 +334,7 @@
               <div key={b.id} style={{padding: '10px', background: '#f8fafc', borderRadius: '8px', marginBottom: '8px', border: '1px solid #e2e8f0'}}>
                 <strong>{b.title}</strong>
                 <p style={{margin: '4px 0', fontSize: '0.75rem', color: '#666'}}>Published by {b.uploader}</p>
-                <button className="btn btn-primary" style={{padding: '6px', fontSize: '0.8rem'}} onClick={()=>setReadingBook(b)}>Read & Download</button>
+                <button className="btn btn-primary" style={{padding: '6px', fontSize: '0.8rem'}} onClick={()=>setReadingBook(b)}>Read Online & Download</button>
               </div>
             ))}
           </div>
@@ -298,12 +345,20 @@
     function PracticeTab() {
       const [books, setBooks] = React.useState([]);
       const [quiz, setQuiz] = React.useState(null);
+      const [loading, setLoading] = React.useState(false);
 
       React.useEffect(() => { window.GradExCore.getLibrary().then(setBooks); }, []);
 
-      const startAiPractice = async (title) => {
-        const questions = await window.GradExCore.generateQuestions(title, 5);
-        setQuiz({ title, questions, index: 0, score: 0 });
+      const startAiPractice = async (book) => {
+        setLoading(true);
+        const sourceText = book.textContent || book.title;
+        const questions = await window.GradExCore.generateQuestionsFromText(sourceText, 5);
+        setLoading(false);
+        if (questions && questions.length > 0) {
+          setQuiz({ title: book.title, questions, index: 0, score: 0 });
+        } else {
+          alert("Could not generate questions from this document. Try another note.");
+        }
       };
 
       if (quiz) {
@@ -315,7 +370,7 @@
             <p style={{fontWeight: 'bold'}}>{q.question}</p>
             {q.options.map((opt, i) => (
               <button key={i} className="btn btn-primary" style={{margin: '6px 0', background: '#fff', color: '#000', border: '1px solid #ccc'}} onClick={() => {
-                if(opt === q.answer) alert("Correct!"); else alert("Incorrect!");
+                if(opt === q.answer) alert("Correct!"); else alert(`Incorrect! Correct answer: ${q.answer}`);
                 if(quiz.index + 1 < quiz.questions.length) setQuiz({...quiz, index: quiz.index + 1}); else setQuiz(null);
               }}>
                 {opt}
@@ -328,11 +383,13 @@
       return (
         <div className="card">
           <h2>🤖 AI Market Practice Hub</h2>
-          <p style={{fontSize: '0.85rem', color: 'var(--muted)'}}>Select any marketplace book to generate AI CBT practice questions.</p>
+          <p style={{fontSize: '0.85rem', color: 'var(--muted)'}}>Select any marketplace book below to scan and generate AI CBT practice questions directly from its text.</p>
+          {loading && <p style={{color: 'var(--primary)', fontWeight: 'bold'}}>Scanning PDF text & generating questions with Gemini AI...</p>}
           {books.map(b => (
             <div key={b.id} style={{padding: '10px', background: '#f8fafc', borderRadius: '8px', marginBottom: '8px'}}>
               <strong>{b.title}</strong>
-              <button className="btn btn-primary" style={{padding: '6px', marginTop: '6px'}} onClick={()=>startAiPractice(b.title)}>Start AI Quiz</button>
+              <p style={{fontSize: '0.75rem', color: '#666', margin: '2px 0 6px 0'}}>By {b.uploader}</p>
+              <button disabled={loading} className="btn btn-primary" style={{padding: '6px'}} onClick={()=>startAiPractice(b)}>Scan & Start AI Quiz</button>
             </div>
           ))}
         </div>
