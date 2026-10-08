@@ -9,105 +9,185 @@
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <!-- Babel for JSX compilation in browser -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Google Gen AI SDK -->
+  <script type="importmap">
+    {
+      "imports": {
+        "@google/genai": "https://esm.run/@google/genai"
+      }
+    }
+  </script>
   <style>
+    :root {
+      --primary-color: #2563eb;
+      --secondary-color: #d81b60;
+      --bg-gradient: linear-gradient(135deg, #f0f4ff 0%, #fdf2f8 100%);
+      --card-bg: #ffffff;
+      --text-main: #1f2937;
+      --text-muted: #4b5563;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: #f4f6f8;
+      background: var(--bg-gradient);
+      background-attachment: fixed;
       margin: 0;
       padding: 0;
-      color: #333;
+      color: var(--text-main);
+      min-height: 100vh;
     }
+
     header {
-      background-color: #1a73e8;
+      background: linear-gradient(90deg, #1e40af, #2563eb);
       color: white;
-      padding: 15px;
+      padding: 20px;
       text-align: center;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
+
     header h1 {
       margin: 0;
-      font-size: 1.2rem;
+      font-size: 1.4rem;
+      letter-spacing: 0.5px;
     }
+
     header p {
-      margin: 5px 0 0 0;
-      font-size: 0.8rem;
+      margin: 6px 0 0 0;
+      font-size: 0.85rem;
       opacity: 0.9;
     }
-    .challenge-container {
+
+    .main-container {
+      max-width: 550px;
+      margin: 25px auto;
+      padding: 0 15px;
+    }
+
+    .card {
+      background: var(--card-bg);
       padding: 20px;
-      max-width: 500px;
-      margin: 20px auto;
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    }
-    h2 {
-      color: #d81b60;
-      font-size: 1.4rem;
-      margin-top: 0;
-    }
-    .form-box {
-      background: #fff0f3;
-      padding: 15px;
-      border-radius: 8px;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
       margin-bottom: 20px;
+      border: 1px solid rgba(229, 231, 235, 0.8);
     }
+
+    h2 {
+      color: var(--secondary-color);
+      font-size: 1.3rem;
+      margin-top: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .form-box {
+      background: #fff5f7;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      border: 1px solid #ffd8e4;
+    }
+
+    .ai-box {
+      background: #eff6ff;
+      padding: 15px;
+      border-radius: 10px;
+      border: 1px solid #bfdbfe;
+    }
+
     label {
       display: block;
       font-weight: 600;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       margin-bottom: 5px;
+      color: var(--text-muted);
     }
-    input[type="text"], input[type="number"] {
+
+    input[type="text"], input[type="number"], textarea {
       width: 100%;
       padding: 10px;
       margin: 5px 0 15px 0;
-      border: 1px solid #ddd;
-      border-radius: 6px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
       box-sizing: border-box;
+      font-size: 0.95rem;
+      background: #fff;
     }
-    .btn-create {
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .btn {
       width: 100%;
-      background: #d81b60;
-      color: #fff;
       padding: 12px;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       font-weight: bold;
+      font-size: 0.95rem;
       cursor: pointer;
+      transition: opacity 0.2s ease;
     }
-    .btn-create:disabled {
-      background: #f8bbd0;
+
+    .btn:hover {
+      opacity: 0.9;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
       cursor: not-allowed;
     }
-    .room-ready-box {
-      background: #e8f5e9;
-      padding: 15px;
-      border-radius: 8px;
-      border: 1px solid #c8e6c9;
+
+    .btn-create {
+      background: var(--secondary-color);
+      color: #fff;
     }
+
+    .btn-ai {
+      background: var(--primary-color);
+      color: #fff;
+    }
+
+    .room-ready-box {
+      background: #f0fdf4;
+      padding: 15px;
+      border-radius: 10px;
+      border: 1px solid #bbf7d0;
+    }
+
     .room-ready-box p {
       font-weight: bold;
-      color: #2e7d32;
+      color: #166534;
       margin-top: 0;
     }
+
     .btn-whatsapp {
-      width: 100%;
       background: #25d366;
       color: #fff;
-      padding: 12px;
-      border: none;
-      border-radius: 6px;
-      font-weight: bold;
-      cursor: pointer;
       margin-top: 5px;
     }
+
     .room-empty-box {
-      background: #f9f9f9;
+      background: #f9fafb;
       padding: 15px;
-      border-radius: 8px;
+      border-radius: 10px;
       text-align: center;
-      color: #888;
-      border: 1px dashed #ddd;
+      color: #9ca3af;
+      border: 1px dashed #d1d5db;
+      font-size: 0.9rem;
+    }
+
+    .ai-result {
+      background: #ffffff;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+      margin-top: 10px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
     }
   </style>
 </head>
@@ -118,20 +198,33 @@
     <p>Smart Library, CBT & Staked Arena</p>
   </header>
 
-  <div id="root"></div>
+  <div class="main-container" id="root"></div>
+
+  <script type="module">
+    import { GoogleGenAI } from "@google/genai";
+    window.GoogleGenAI = GoogleGenAI;
+  </script>
 
   <script type="text/babel">
-    function ChallengeRoom() {
+    function App() {
+      // Challenge Room States
       const [topic, setTopic] = React.useState('');
       const [stake, setStake] = React.useState('');
       const [createdRoom, setCreatedRoom] = React.useState(null);
-      const [loading, setLoading] = React.useState(false);
+      const [loadingRoom, setLoadingRoom] = React.useState(false);
 
+      // AI Explanation States
+      const [studyText, setStudyText] = React.useState('');
+      const [aiExplanation, setAiExplanation] = React.useState('');
+      const [loadingAi, setLoadingAi] = React.useState(false);
+      const [aiError, setAiError] = React.useState('');
+
+      // Handle Room Creation
       const handleCreateRoom = (e) => {
         e.preventDefault();
         if (!topic || !stake) return;
 
-        setLoading(true);
+        setLoadingRoom(true);
         setTimeout(() => {
           const mockRoomCode = Math.floor(1000 + Math.random() * 9000);
           const generatedLink = `${window.location.origin}${window.location.pathname}?room=${mockRoomCode}&topic=${encodeURIComponent(topic)}`;
@@ -142,10 +235,11 @@
             stake: stake,
             link: generatedLink
           });
-          setLoading(false);
-        }, 600);
+          setLoadingRoom(false);
+        }, 500);
       };
 
+      // Handle WhatsApp Share
       const handleWhatsAppShare = () => {
         if (!createdRoom) return;
 
@@ -156,64 +250,126 @@
         window.open(whatsappUrl, '_blank');
       };
 
+      // Handle Gemini AI Explanation Request
+      const handleAskGemini = async () => {
+        if (!studyText.trim()) return;
+
+        setLoadingAi(true);
+        setAiError('');
+        setAiExplanation('');
+
+        try {
+          // Hardcoded API key for seamless stability across environments
+          const ai = new window.GoogleGenAI({ apiKey: "AIzaSyAkc3n8USamQikTOo8dwQOafEQwJXL6_Ek" });
+          
+          const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: `Please explain this study text clearly and concisely for a student: "${studyText}"`,
+          });
+
+          setAiExplanation(response.text);
+        } catch (err) {
+          console.error("Gemini AI request failed:", err);
+          setAiError("Gemini AI request failed. Please try again.");
+        } finally {
+          setLoadingAi(false);
+        }
+      };
+
       return (
-        <div className="challenge-container">
-          <h2>Money Bet Arena</h2>
-          <p style={{ fontSize: '0.85rem', color: '#666' }}>Platform takes a sustainable 10% commission. Winner takes 90% of the pool!</p>
+        <div>
+          {/* Money Bet Arena Section */}
+          <div className="card">
+            <h2>🏆 Money Bet Arena</h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Platform takes a sustainable 10% commission. Winner takes 90% of the pool!</p>
 
-          <form onSubmit={handleCreateRoom} className="form-box">
-            <h3 style={{ fontSize: '1rem', marginTop: 0, color: '#333' }}>🔥 Create Staked Challenge Room</h3>
-            
-            <label>Enter Battle Topic</label>
-            <input 
-              type="text" 
-              value={topic} 
-              onChange={(e) => setTopic(e.target.value)} 
-              placeholder="e.g. GNS 102" 
-              required 
-            />
-
-            <label>Bet Stake Amount (₦)</label>
-            <input 
-              type="number" 
-              value={stake} 
-              onChange={(e) => setStake(e.target.value)} 
-              placeholder="100" 
-              required 
-            />
-
-            <button type="submit" disabled={loading} className="btn-create">
-              {loading ? 'Creating Room...' : 'Stake & Create Link'}
-            </button>
-          </form>
-
-          {createdRoom ? (
-            <div className="room-ready-box">
-              <p>✅ Room Ready! Share Link:</p>
+            <form onSubmit={handleCreateRoom} className="form-box">
+              <h3 style={{ fontSize: '0.95rem', marginTop: 0, color: 'var(--text-main)' }}>🔥 Create Staked Challenge Room</h3>
+              
+              <label>Enter Battle Topic</label>
               <input 
                 type="text" 
-                readOnly 
-                value={createdRoom.link} 
-                style={{ background: '#fff' }} 
+                value={topic} 
+                onChange={(e) => setTopic(e.target.value)} 
+                placeholder="e.g. GNS 102" 
+                required 
               />
+
+              <label>Bet Stake Amount (₦)</label>
+              <input 
+                type="number" 
+                value={stake} 
+                onChange={(e) => setStake(e.target.value)} 
+                placeholder="100" 
+                required 
+              />
+
+              <button type="submit" disabled={loadingRoom} className="btn btn-create">
+                {loadingRoom ? 'Creating Room...' : 'Stake & Create Link'}
+              </button>
+            </form>
+
+            {createdRoom ? (
+              <div className="room-ready-box">
+                <p>✅ Room Ready! Share Link:</p>
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={createdRoom.link} 
+                  style={{ background: '#fff', marginBottom: '10px' }} 
+                />
+                <button 
+                  type="button" 
+                  onClick={handleWhatsAppShare} 
+                  className="btn btn-whatsapp"
+                >
+                  💬 Share to WhatsApp
+                </button>
+              </div>
+            ) : (
+              <div className="room-empty-box">
+                <p>Create a room above to generate your invite link and fill this section.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Gemini AI Smart Explanation Section */}
+          <div className="card">
+            <h2>✨ Smart Study Assistant</h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Highlight or paste tough notes to get instant AI breakdowns.</p>
+
+            <div className="ai-box">
+              <label>Paste Topic or Note Text</label>
+              <textarea 
+                value={studyText} 
+                onChange={(e) => setStudyText(e.target.value)} 
+                placeholder="e.g. Explain photosynthesis or summarize GNS 102 concepts..."
+              />
+
               <button 
                 type="button" 
-                onClick={handleWhatsAppShare} 
-                className="btn-whatsapp"
+                onClick={handleAskGemini} 
+                disabled={loadingAi} 
+                className="btn btn-ai"
               >
-                💬 Share to WhatsApp
+                {loadingAi ? 'Thinking...' : 'Ask Gemini AI to Explain'}
               </button>
+
+              {aiError && <p style={{ color: '#dc2626', fontSize: '0.85rem', marginTop: '10px' }}>⚠️ {aiError}</p>}
+
+              {aiExplanation && (
+                <div className="ai-result">
+                  <strong style={{ color: 'var(--primary-color)' }}>AI Explanation:</strong>
+                  <p style={{ margin: '8px 0 0 0' }}>{aiExplanation}</p>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="room-empty-box">
-              <p>Create a room above to generate your invite link and fill this section.</p>
-            </div>
-          )}
+          </div>
         </div>
       );
     }
 
-    ReactDOM.render(<ChallengeRoom />, document.getElementById('root'));
+    ReactDOM.render(<App />, document.getElementById('root'));
   </script>
 
 </body>
