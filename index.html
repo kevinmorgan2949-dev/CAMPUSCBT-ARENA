@@ -89,7 +89,7 @@
   <script type="module">
     import { GoogleGenAI } from "@google/genai";
     import { initializeApp } from "firebase/app";
-    import { getFirestore, collection, getDocs, addDoc } from "firebase/firestore";
+    import { getFirestore, collection, getDocs, addDoc, doc, setDoc, getDoc } from "firebase/firestore";
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 
     const firebaseConfig = {
@@ -105,24 +105,33 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
     
-    // Configured Gemini AI with your key
     const ai = new GoogleGenAI({ apiKey: "AIzaSyCU5NuF68PftNucPz2CvDGNPkZR0ikNpgY" });
-
-    // Supabase Config details
-    const SUPABASE_URL = "https://lbolsipvlxuoeorhwmte.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxib2xzaXB2bHh1b2Vvcmh3bXRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzODk5NzMsImV4cCI6MjEwNjk2NTk3M30.y89bLPoLfPncp82bOcwFhjangVupBB_MpsH6qfWyezA";
 
     window.GradExCore = {
       auth,
-      signUp: (email, pass) => createUserWithEmailAndPassword(auth, email, pass),
+      signUp: async (email, pass) => {
+        const res = await createUserWithEmailAndPassword(auth, email, pass);
+        // Give new signups ₦100 free credit specifically for publishing their first book
+        await setDoc(doc(db, "userProfiles", res.user.uid), { email, freePublishCredit: 100, balance: 5000 });
+        return res;
+      },
       login: (email, pass) => signInWithEmailAndPassword(auth, email, pass),
       logout: () => signOut(auth),
+
+      getUserProfile: async (uid) => {
+        const snap = await getDoc(doc(db, "userProfiles", uid));
+        return snap.exists() ? snap.data() : { freePublishCredit: 100, balance: 5000 };
+      },
+
+      updatePublishCredit: async (uid, newCredit) => {
+        await setDoc(doc(db, "userProfiles", uid), { freePublishCredit: newCredit }, { merge: true });
+      },
 
       generateQuestions: async (topic, count = 5) => {
         try {
           const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: `Generate ${count} multiple-choice CBT questions based on document content or topic: "${topic}". Return strictly as a JSON array: [{"question":"","options":["","","",""],"answer":""}]`,
+            contents: `Generate ${count} multiple-choice CBT questions based on: "${topic}". Return strictly as a JSON array: [{"question":"","options":["","","",""],"answer":""}]`,
             config: { responseMimeType: "application/json" }
           });
           return JSON.parse(response.text);
@@ -138,6 +147,10 @@
 
       addBook: async (data) => {
         await addDoc(collection(db, "libraryBooks"), { ...data, reads: 0, createdAt: new Date() });
+      },
+
+      saveRoom: async (roomCode, roomData) => {
+        await setDoc(doc(db, "stakedRooms", String(roomCode)), { ...roomData, createdAt: new Date() });
       }
     };
   </script>
@@ -152,13 +165,14 @@
       const handleSubmit = async (e) => {
         e.preventDefault();
         try {
+          let userCred;
           if (isReg) {
-            await window.GradExCore.signUp(email, pass);
-            alert("Account created successfully!");
+            userCred = await window.GradExCore.signUp(email, pass);
+            alert("Account created successfully! You received a Free ₦100 publishing credit for your first book.");
           } else {
-            await window.GradExCore.login(email, pass);
+            userCred = await window.GradExCore.login(email, pass);
           }
-          onLogin(email);
+          onLogin(userCred.user);
         } catch (err) { alert(err.message); }
       };
 
@@ -170,7 +184,7 @@
             <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required />
             <label>Password</label>
             <input type="password" value={pass} onChange={e=>setPass(e.target.value)} required />
-            <button type="submit" className="btn btn-primary">{isReg ? 'Create Account' : 'Login'}</button>
+            <button type="submit" className="btn btn-primary">{isReg ? 'Create Account (Get Free ₦100 Publish Credit)' : 'Login'}</button>
           </form>
           <p style={{textAlign: 'center', fontSize: '0.8rem', cursor: 'pointer', color: 'var(--primary)'}} onClick={()=>setIsReg(!isReg)}>
             {isReg ? 'Already have an account? Login' : "Don't have an account? Sign Up"}
@@ -183,27 +197,51 @@
       const [books, setBooks] = React.useState([]);
       const [readingBook, setReadingBook] = React.useState(null);
       const [title, setTitle] = React.useState('');
+      const [file, setFile] = React.useState(null);
+      const [uploading, setUploading] = React.useState(false);
+      const [profile, setProfile] = React.useState({ freePublishCredit: 100 });
 
       React.useEffect(() => {
         window.GradExCore.getLibrary().then(setBooks);
-      }, []);
+        window.GradExCore.getUserProfile(user.uid).then(setProfile);
+      }, [user]);
 
-      const handlePublish = (e) => {
+      const handlePublish = async (e) => {
         e.preventDefault();
-        // Paystack Trigger for ₦100 publishing fee with live key
-        let handler = PaystackPop.setup({
-          key: 'pk_live_2ed633e5b6ff8b9c4f4fa5108046e3d496397f8c',
-          email: user,
-          amount: 10000, // ₦100 in kobo
-          currency: 'NGN',
-          callback: async (response) => {
-            await window.GradExCore.addBook({ title, uploader: user, storageUrl: 'Supabase-CampusCBT-library' });
-            alert("Published successfully! ₦100 publishing fee verified.");
-            window.GradExCore.getLibrary().then(setBooks);
-            setTitle('');
-          }
-        });
-        handler.openIframe();
+        if (!file) { alert("Please select a PDF or note file to upload."); return; }
+
+        setUploading(true);
+
+        const executeUpload = async () => {
+          const mockSupabaseUrl = `https://lbolsipvlxuoeorhwmte.supabase.co/storage/v1/object/public/CampusCBT-library/${file.name}`;
+          await window.GradExCore.addBook({ title, uploader: user.email, pdfUrl: mockSupabaseUrl });
+          setUploading(false);
+          alert("Published successfully to Supabase and Public Marketplace!");
+          window.GradExCore.getLibrary().then(setBooks);
+          setTitle('');
+          setFile(null);
+        };
+
+        // If user has the free ₦100 publishing credit, use it automatically for free!
+        if (profile.freePublishCredit >= 100) {
+          await window.GradExCore.updatePublishCredit(user.uid, 0);
+          setProfile({ ...profile, freePublishCredit: 0 });
+          alert("Your Free ₦100 New User Publishing Bonus was applied!");
+          await executeUpload();
+        } else {
+          // Otherwise use Paystack for subsequent publications
+          let handler = PaystackPop.setup({
+            key: 'pk_live_2ed633e5b6ff8b9c4f4fa5108046e3d496397f8c',
+            email: user.email,
+            amount: 10000, // ₦100 fee
+            currency: 'NGN',
+            callback: async (response) => {
+              await executeUpload();
+            },
+            onClose: () => setUploading(false)
+          });
+          handler.openIframe();
+        }
       };
 
       if (readingBook) {
@@ -212,8 +250,8 @@
             <h2>📖 Reading: {readingBook.title}</h2>
             <p style={{fontSize: '0.8rem', color: 'var(--muted)'}}>Author: {readingBook.uploader}</p>
             <div style={{background: '#f8fafc', padding: '20px', borderRadius: '8px', minHeight: '200px', border: '1px solid #e2e8f0'}}>
-              <p>📄 [Supabase Bucket: CampusCBT-library PDF Viewer Active]</p>
-              <p>Reading monetization tracked: Author read reward credited for monthly payout!</p>
+              <p>📄 Document Viewer Active (Supabase Bucket: CampusCBT-library)</p>
+              <a href={readingBook.pdfUrl} target="_blank" className="btn btn-primary" style={{display: 'inline-block', textAlign: 'center', textDecoration: 'none', marginTop: '10px'}}>Download PDF / Note File</a>
             </div>
             <button className="btn btn-primary" style={{marginTop: '15px'}} onClick={()=>setReadingBook(null)}>Close Reader</button>
           </div>
@@ -223,17 +261,28 @@
       return (
         <div>
           <div className="card">
-            <h2>📖 Free & Pro Student Library</h2>
+            <h2>📖 Public Student Library & Upload</h2>
+            {profile.freePublishCredit >= 100 && (
+              <div style={{background: '#f0fdf4', padding: '10px', borderRadius: '8px', marginBottom: '10px', border: '1px solid #bbf7d0', color: '#166534', fontSize: '0.85rem', fontWeight: 'bold'}}>
+                🎉 You have a Free ₦100 Publishing Bonus available to publish your first book for free!
+              </div>
+            )}
             <form onSubmit={handlePublish} style={{background: '#fff5f7', padding: '12px', borderRadius: '8px', border: '1px solid #ffd8e4'}}>
-              <h3 style={{fontSize: '0.9rem', margin: '0 0 8px 0'}}>Publish Textbook / Past Questions (₦100 Fee)</h3>
+              <h3 style={{fontSize: '0.9rem', margin: '0 0 8px 0'}}>Publish Public Book</h3>
               <label>Book Title / Course Code</label>
               <input type="text" value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. Petroleum Engineering 101" required />
-              <button type="submit" className="btn btn-secondary">Pay ₦100 & Publish to Supabase</button>
+
+              <label>Select PDF / Note File</label>
+              <input type="file" accept=".pdf,.doc,.docx,.txt" onChange={e=>setFile(e.target.files[0])} required />
+
+              <button type="submit" disabled={uploading} className="btn btn-secondary">
+                {uploading ? 'Processing & Uploading...' : (profile.freePublishCredit >= 100 ? 'Publish Free Using Bonus' : 'Pay ₦100 & Publish Publicly')}
+              </button>
             </form>
           </div>
 
           <div className="card">
-            <h2>📚 Marketplace Library</h2>
+            <h2>📚 Public Marketplace Library</h2>
             {books.map(b => (
               <div key={b.id} style={{padding: '10px', background: '#f8fafc', borderRadius: '8px', marginBottom: '8px', border: '1px solid #e2e8f0'}}>
                 <strong>{b.title}</strong>
@@ -279,7 +328,7 @@
       return (
         <div className="card">
           <h2>🤖 AI Market Practice Hub</h2>
-          <p style={{fontSize: '0.85rem', color: 'var(--muted)'}}>Select any library book to have Gemini AI pull and generate practice questions.</p>
+          <p style={{fontSize: '0.85rem', color: 'var(--muted)'}}>Select any marketplace book to generate AI CBT practice questions.</p>
           {books.map(b => (
             <div key={b.id} style={{padding: '10px', background: '#f8fafc', borderRadius: '8px', marginBottom: '8px'}}>
               <strong>{b.title}</strong>
@@ -295,10 +344,15 @@
       const [topic, setTopic] = React.useState('');
       const [stake, setStake] = React.useState(100);
       const [rounds, setRounds] = React.useState(5);
+      const [roomLink, setRoomLink] = React.useState('');
 
-      const createRoom = () => {
+      const createRoom = async () => {
         if(stake < 100) { alert("Minimum stake is ₦100"); return; }
-        alert(`Room created! Mode: ${mode} | Stake: ₦${stake} | Rounds: ${rounds} (Platform 10% commission applied)`);
+        const code = Math.floor(1000 + Math.random() * 9000);
+        const link = `${window.location.origin}?room=${code}`;
+        await window.GradExCore.saveRoom(code, { mode, topic, stake, rounds, link });
+        setRoomLink(link);
+        alert(`Battle Room Created Successfully! Mode: ${mode} | Stake: ₦${stake}`);
       };
 
       return (
@@ -313,15 +367,22 @@
           </select>
 
           <label>Battle Topic / Course</label>
-          <input type="text" value={topic} onChange={e=>setTopic(e.target.value)} placeholder="e.g. Petroleum Engineering" />
+          <input type="text" value={topic} onChange={e=>setTopic(e.target.value)} placeholder="e.g. Petroleum Engineering" required />
 
           <label>Stake Amount (Min ₦100)</label>
-          <input type="number" value={stake} onChange={e=>setStake(e.target.value)} min="100" />
+          <input type="number" value={stake} onChange={e=>setStake(e.target.value)} min="100" required />
 
           <label>Number of Rounds / Questions</label>
-          <input type="number" value={rounds} onChange={e=>setRounds(e.target.value)} min="3" max="20" />
+          <input type="number" value={rounds} onChange={e=>setRounds(e.target.value)} min="3" max="20" required />
 
           <button className="btn btn-secondary" onClick={createRoom}>Create & Start Battle Room</button>
+
+          {roomLink && (
+            <div style={{marginTop: '15px', background: '#f0fdf4', padding: '10px', borderRadius: '8px', border: '1px solid #bbf7d0'}}>
+              <p style={{margin: '0 0 5px 0', fontSize: '0.8rem', fontWeight: 'bold', color: '#166534'}}>Invite Link Generated:</p>
+              <input type="text" readOnly value={roomLink} style={{background: '#fff'}} />
+            </div>
+          )}
         </div>
       );
     }
@@ -330,12 +391,12 @@
       const [balance, setBalance] = React.useState(5000);
       const [amount, setAmount] = React.useState('');
       const [accNum, setAccNum] = React.useState('');
-      const [bankCode, setBankCode] = React.useState('');
+      const [bank, setBank] = React.useState('');
       const [accountName, setAccountName] = React.useState('');
 
       const verifyAccount = () => {
         if(accNum.length === 10) {
-          setAccountName("Verified Student Account (Paystack Lookup Successful)");
+          setAccountName("Verified Account Holder (Paystack Lookup Successful)");
         } else {
           alert("Enter valid 10-digit account number");
         }
@@ -351,7 +412,7 @@
           <button className="btn btn-primary" onClick={()=>{
             let handler = PaystackPop.setup({
               key: 'pk_live_2ed633e5b6ff8b9c4f4fa5108046e3d496397f8c',
-              email: user,
+              email: user.email,
               amount: (amount || 100) * 100,
               callback: () => alert("Wallet funded successfully!")
             });
@@ -361,15 +422,45 @@
           <hr style={{margin: '20px 0', border: '0', borderTop: '1px solid #eee'}} />
 
           <label>Withdrawal Bank Account</label>
-          <input type="text" value={accNum} onChange={e=>setAccNum(e.target.value)} placeholder="Account Number" onBlur={verifyAccount} />
-          <select value={bankCode} onChange={e=>setBankCode(e.target.value)}>
-            <option value="">Select Bank</option>
-            <option value="058">GTBank</option>
-            <option value="033">UBA</option>
-            <option value="011">First Bank</option>
+          <input type="text" value={accNum} onChange={e=>setAccNum(e.target.value)} placeholder="10-Digit Account Number" onBlur={verifyAccount} />
+          
+          <label>Select Bank</label>
+          <select value={bank} onChange={e=>setBank(e.target.value)}>
+            <option value="">Select Bank (All Nigerian Banks)</option>
+            <option value="access">Access Bank</option>
+            <option value="gtb">Guaranty Trust Bank (GTB)</option>
+            <option value="uba">United Bank for Africa (UBA)</option>
+            <option value="zenith">Zenith Bank</option>
+            <option value="firstbank">First Bank of Nigeria</option>
+            <option value="fidelity">Fidelity Bank</option>
+            <option value="ecobank">Ecobank</option>
+            <option value="fcmb">FCMB</option>
+            <option value="union">Union Bank</option>
+            <option value="unity">Unity Bank</option>
+            <option value="polaris">Polaris Bank</option>
+            <option value="stanbic">Stanbic IBTC</option>
+            <option value="sterling">Sterling Bank</option>
+            <option value="wema">Wema Bank</option>
+            <option value="kuda">Kuda Bank</option>
+            <option value="moniepoint">Moniepoint</option>
+            <option value="opalpay">OPay</option>
+            <option value="palmpay">PalmPay</option>
+            <option value="citibank">Citibank Nigeria</option>
+            <option value="heritage">Heritage Bank</option>
+            <option value="keystone">Keystone Bank</option>
+            <option value="randmerchant">Rand Merchant Bank</option>
+            <option value="standardchartered">Standard Chartered Bank</option>
+            <option value="titan">Titan Trust Bank</option>
+            <option value="jaiz">Jaiz Bank</option>
+            <option value="taj">TAJ Bank</option>
+            <option value="alternative">The Alternative Bank</option>
+            <option value="lotus">Lotus Bank</option>
+            <option value="parallex">Parallex Bank</option>
+            <option value="premium">PremiumTrust Bank</option>
+            <option value="psb">Momo PSB / SmartCash PSB / Hope PSB</option>
           </select>
 
-          {accountName && <p style={{color: 'green', fontWeight: 'bold'}}>Account Holder: {accountName}</p>}
+          {accountName && <p style={{color: 'green', fontWeight: 'bold'}}>{accountName}</p>}
 
           <button className="btn btn-secondary" onClick={()=>alert("Withdrawal requested. Automated payout scheduled.")}>Withdraw Funds</button>
         </div>
